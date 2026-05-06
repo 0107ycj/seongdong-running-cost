@@ -376,16 +376,24 @@ elif st.session_state.page == 'result':
             .leaflet-layer, .leaflet-control-zoom-in, .leaflet-control-zoom-out { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
             
             /* 💡 거점 이름 스타일 수정 (글씨 크기 축소 및 가로 정렬 강제) */
-            .label-tooltip {
-                background: transparent !important; border: none !important; box-shadow: none !important;
-                color: #FFF !important; 
-                font-weight: 800 !important; 
-                font-size: 11px !important; 
-                text-shadow: 0 0 5px #000, 0 0 10px #000 !important; 
-                margin-top: -12px !important;
-                white-space: nowrap !important;
-                pointer-events: none;
-            }
+            /* 💡 기존 .label-tooltip 부분을 아래로 완전히 교체 */
+.label-tooltip {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #FFFFFF !important;
+    font-weight: 800 !important;
+    font-size: 11px !important; /* 글씨 크기 작게 */
+    text-shadow: 0 0 5px #000, 0 0 10px #000 !important;
+    margin-top: -12px !important;
+    
+    /* 가로 정렬을 강제하는 핵심 속성들 */
+    white-space: nowrap !important;    /* 줄바꿈 금지 */
+    display: block !important;         /* 블록 요소로 설정 */
+    width: auto !important;            /* 너비 자동 조절 */
+    min-width: 100px !important;       /* 최소 너비 확보로 세로 방지 */
+    text-align: center !important;
+}
 
             .bottom-sheet { 
                 position: absolute; bottom: 0; left: 0; width: 100%; 
@@ -499,15 +507,16 @@ elif st.session_state.page == 'result':
 
         markers.forEach(m => {
             L.circleMarker([m.lat, m.lon], { color: m.color, radius: 7, fillOpacity: 1, weight: 2, fillColor: '#111' })
-             .bindTooltip(m.name, { 
-                permanent: true, 
-                direction: 'top', 
-                className: 'label-tooltip', 
-                offset: [0, -10],
-                opacity: 1.0
-             })
-             .addTo(map);
-        });
+             /* 💡 .bindTooltip(...) 부분을 아래로 완전히 교체 */
+.bindTooltip(m.name, { 
+    permanent: true, 
+    direction: 'top',      /* 마커 위쪽으로 배치 */
+    className: 'label-tooltip', 
+    offset: [0, -10],      /* 위치 미세 조정 */
+    opacity: 1.0,
+    sticky: false,         /* 고정 모드 */
+    interactive: false     /* 클릭 무시 */
+})
 
         if (approachSegs.length > 0) L.polyline(approachSegs, { color: '#FF9500', weight: 4, dashArray: '6, 8', opacity: 0.9 }).addTo(appLayer);
 
