@@ -383,18 +383,16 @@ elif st.session_state.page == 'result':
     box-shadow: none !important;
     color: #FFFFFF !important;
     font-weight: 800 !important;
-    font-size: 11px !important; /* 글씨 크기 작게 */
+    font-size: 11px !important;
     text-shadow: 0 0 5px #000, 0 0 10px #000 !important;
-    margin-top: -12px !important;
     
-    /* 가로 정렬을 강제하는 핵심 속성들 */
-    white-space: nowrap !important;    /* 줄바꿈 금지 */
-    display: block !important;         /* 블록 요소로 설정 */
-    width: auto !important;            /* 너비 자동 조절 */
-    min-width: 100px !important;       /* 최소 너비 확보로 세로 방지 */
-    text-align: center !important;
+    /* 💡 가로 고정을 위한 초강력 설정 */
+    white-space: nowrap !important;     /* 절대로 줄바꿈 금지 */
+    display: inline-block !important;   /* 가로 흐름 허용 */
+    min-width: 150px !important;        /* 좁은 영역에 갇히지 않게 최소 150px 확보 */
+    text-align: center !important;      /* 확보된 150px 안에서 가운데 정렬 */
+    margin-left: -75px !important;      /* 150px의 절반만큼 왼쪽으로 밀어서 마커 중앙에 맞춤 */
 }
-
             .bottom-sheet { 
                 position: absolute; bottom: 0; left: 0; width: 100%; 
                 background: var(--bg-elevated); backdrop-filter: blur(20px); border-top: 1px solid rgba(255, 255, 255, 0.1); 
@@ -510,14 +508,11 @@ elif st.session_state.page == 'result':
              /* 💡 .bindTooltip(...) 부분을 아래로 완전히 교체 */
 .bindTooltip(m.name, { 
     permanent: true, 
-    direction: 'top',      /* 마커 위쪽으로 배치 */
+    direction: 'center', /* 💡 top 대신 center로 두고 CSS margin-top으로 조절하는 게 더 안정적일 수 있습니다 */
     className: 'label-tooltip', 
-    offset: [0, -10],      /* 위치 미세 조정 */
-    opacity: 1.0,
-    sticky: false,         /* 고정 모드 */
-    interactive: false     /* 클릭 무시 */
+    offset: [0, -15], 
+    opacity: 1.0
 })
-
         if (approachSegs.length > 0) L.polyline(approachSegs, { color: '#FF9500', weight: 4, dashArray: '6, 8', opacity: 0.9 }).addTo(appLayer);
 
         if (mode === "A_TO_B") {
