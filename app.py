@@ -376,11 +376,14 @@ elif st.session_state.page == 'result':
             .leaflet-layer, .leaflet-control-zoom-in, .leaflet-control-zoom-out { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
             
             .label-tooltip {
-                background: transparent; border: none; box-shadow: none;
-                color: #FFF; font-weight: 800; font-size: 13px;
-                text-shadow: 0 0 5px #000, 0 0 10px #000; margin-top: -10px;
-            }
-
+    background: transparent !important; border: none !important; box-shadow: none !important;
+    color: #FFF !important; 
+    font-weight: 800 !important; 
+    font-size: 11px !important; /* 💡 글씨 크기를 13->11로 줄임 */
+    text-shadow: 0 0 5px #000, 0 0 10px #000 !important; 
+    margin-top: -12px !important;
+    white-space: nowrap !important; /* 💡 줄바꿈 방지하여 가로로 유지 */
+}
             .bottom-sheet { 
                 position: absolute; bottom: 0; left: 0; width: 100%; 
                 background: var(--bg-elevated); backdrop-filter: blur(20px); border-top: 1px solid rgba(255, 255, 255, 0.1); 
@@ -494,7 +497,14 @@ elif st.session_state.page == 'result':
 
         markers.forEach(m => {
             L.circleMarker([m.lat, m.lon], { color: m.color, radius: 7, fillOpacity: 1, weight: 2, fillColor: '#111' })
-             .bindTooltip(m.name, { permanent: true, direction: 'top', className: 'label-tooltip', offset: [0, -10] })
+             .bindTooltip(m.name, { 
+    permanent: true, 
+    direction: 'top', 
+    className: 'label-tooltip', 
+    offset: [0, -10],
+    opacity: 1.0,
+    overflow: 'visible' /* 💡 잘림 방지 */
+})
              .addTo(map);
         });
 
