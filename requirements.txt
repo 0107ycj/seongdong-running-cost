@@ -1,8 +1,5 @@
 streamlit
 pandas
-shapely
-fiona
-pyproj
 geopandas
 networkx
 folium
