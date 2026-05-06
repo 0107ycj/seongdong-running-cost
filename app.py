@@ -385,15 +385,16 @@ elif st.session_state.page == 'result':
     font-weight: 800 !important;
     font-size: 11px !important;
     text-shadow: 0 0 5px #000, 0 0 10px #000 !important;
-    
-    /* 💡 가로 고정을 위한 초강력 설정 */
-    white-space: nowrap !important;     /* 절대로 줄바꿈 금지 */
-    display: inline-block !important;   /* 가로 흐름 허용 */
-    min-width: 150px !important;        /* 좁은 영역에 갇히지 않게 최소 150px 확보 */
-    text-align: center !important;      /* 확보된 150px 안에서 가운데 정렬 */
-    margin-left: -75px !important;      /* 150px의 절반만큼 왼쪽으로 밀어서 마커 중앙에 맞춤 */
-}
-            .bottom-sheet { 
+
+    /* 💡 세로 줄바꿈을 절대적으로 막는 속성들 */
+    white-space: nowrap !important;     /* 텍스트 줄바꿈 금지 */
+    display: inline-block !important;   /* 가로 공간 차지 */
+    width: 150px !important;            /* 너비를 150px로 아예 고정 (auto보다 안전) */
+    min-width: 150px !important;
+    text-align: center !important;
+    overflow: visible !important;       /* 넘쳐도 잘리지 않게 */
+    margin-left: -75px !important;      /* 너비 150px의 절반만큼 왼쪽으로 당겨서 중앙 정렬 */
+}           .bottom-sheet { 
                 position: absolute; bottom: 0; left: 0; width: 100%; 
                 background: var(--bg-elevated); backdrop-filter: blur(20px); border-top: 1px solid rgba(255, 255, 255, 0.1); 
                 border-radius: 32px 32px 0 0; z-index: 100; padding: 25px; box-sizing: border-box;
@@ -506,13 +507,23 @@ elif st.session_state.page == 'result':
         markers.forEach(m => {
             L.circleMarker([m.lat, m.lon], { color: m.color, radius: 7, fillOpacity: 1, weight: 2, fillColor: '#111' })
              /* 💡 .bindTooltip(...) 부분을 아래로 완전히 교체 */
-.bindTooltip(m.name, { 
-    permanent: true, 
-    direction: 'center', /* 💡 top 대신 center로 두고 CSS margin-top으로 조절하는 게 더 안정적일 수 있습니다 */
-    className: 'label-tooltip', 
-    offset: [0, -15], 
-    opacity: 1.0
-})
+markers.forEach(m => {
+    L.circleMarker([m.lat, m.lon], { color: m.color, radius: 7, fillOpacity: 1, weight: 2, fillColor: '#111' })
+     .bindTooltip(
+        // 💡 텍스트 양옆에 강제로 공백(&nbsp;)을 넣어서 브라우저가 가로로 인식하게 유도합니다.
+        "&nbsp;&nbsp;" + m.name + "&nbsp;&nbsp;", 
+        { 
+            permanent: true, 
+            direction: 'top', 
+            className: 'label-tooltip', 
+            offset: [0, -10],
+            opacity: 1.0,
+            // 💡 툴팁 상자가 텍스트보다 작아지지 않게 설정
+            noHide: true
+        }
+     )
+     .addTo(map);
+});
         if (approachSegs.length > 0) L.polyline(approachSegs, { color: '#FF9500', weight: 4, dashArray: '6, 8', opacity: 0.9 }).addTo(appLayer);
 
         if (mode === "A_TO_B") {
