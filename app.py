@@ -375,24 +375,26 @@ elif st.session_state.page == 'result':
             .leaflet-control-attribution { display: none !important; }
             .leaflet-layer, .leaflet-control-zoom-in, .leaflet-control-zoom-out { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
             
+            /* 💡 거점 이름 스타일 수정 (글씨 크기 축소 및 가로 정렬 강제) */
             .label-tooltip {
-    background: transparent !important; border: none !important; box-shadow: none !important;
-    color: #FFF !important; 
-    font-weight: 800 !important; 
-    font-size: 11px !important; /* 💡 글씨 크기를 13->11로 줄임 */
-    text-shadow: 0 0 5px #000, 0 0 10px #000 !important; 
-    margin-top: -12px !important;
-    white-space: nowrap !important; /* 💡 줄바꿈 방지하여 가로로 유지 */
-}
+                background: transparent !important; border: none !important; box-shadow: none !important;
+                color: #FFF !important; 
+                font-weight: 800 !important; 
+                font-size: 11px !important; 
+                text-shadow: 0 0 5px #000, 0 0 10px #000 !important; 
+                margin-top: -12px !important;
+                white-space: nowrap !important;
+                pointer-events: none;
+            }
+
             .bottom-sheet { 
                 position: absolute; bottom: 0; left: 0; width: 100%; 
                 background: var(--bg-elevated); backdrop-filter: blur(20px); border-top: 1px solid rgba(255, 255, 255, 0.1); 
                 border-radius: 32px 32px 0 0; z-index: 100; padding: 25px; box-sizing: border-box;
                 max-height: 55vh; overflow-y: auto;
-                -ms-overflow-style: none; /* IE and Edge */
-                scrollbar-width: none; /* Firefox */
+                -ms-overflow-style: none; scrollbar-width: none;
             }
-            .bottom-sheet::-webkit-scrollbar { display: none; } /* Chrome, Safari, Opera */
+            .bottom-sheet::-webkit-scrollbar { display: none; }
             
             .toggle-panel { display: flex; gap: 10px; margin-bottom: 15px; }
             .toggle-btn { flex: 1; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: #FFF; padding: 10px; border-radius: 12px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;}
@@ -498,13 +500,12 @@ elif st.session_state.page == 'result':
         markers.forEach(m => {
             L.circleMarker([m.lat, m.lon], { color: m.color, radius: 7, fillOpacity: 1, weight: 2, fillColor: '#111' })
              .bindTooltip(m.name, { 
-    permanent: true, 
-    direction: 'top', 
-    className: 'label-tooltip', 
-    offset: [0, -10],
-    opacity: 1.0,
-    overflow: 'visible' /* 💡 잘림 방지 */
-})
+                permanent: true, 
+                direction: 'top', 
+                className: 'label-tooltip', 
+                offset: [0, -10],
+                opacity: 1.0
+             })
              .addTo(map);
         });
 
@@ -577,21 +578,4 @@ elif st.session_state.page == 'result':
     </body>
     </html>
     """
-    
-    app_html = app_html.replace("___APP_JSON___", app_json)
-    app_html = app_html.replace("___OPT_JSON___", opt_json)
-    app_html = app_html.replace("___SHO_JSON___", sho_json)
-    app_html = app_html.replace("___LOOP_JSON___", loop_json)
-    app_html = app_html.replace("___MARKERS_JSON___", markers_json)
-    app_html = app_html.replace("___BOUNDARY_JSON___", boundary_json)
-    app_html = app_html.replace("___MODE___", mode)
-    app_html = app_html.replace("___U_LAT___", str(u_lat))
-    app_html = app_html.replace("___U_LON___", str(u_lon))
-    app_html = app_html.replace("___DIST_APP___", str(st.session_state.dist_app))
-    app_html = app_html.replace("___DIST_OPT___", str(st.session_state.dist_opt))
-    app_html = app_html.replace("___DIST_SHO___", str(st.session_state.dist_sho))
-    app_html = app_html.replace("___DIST_LOOP___", str(st.session_state.dist_loop))
-
-    components.html(app_html, height=900, scrolling=False)
-
     
