@@ -81,7 +81,7 @@ def load_boundary():
     except: return None
 
 @st.cache_resource
-def load_data_v5():
+def load_data_v7():
     G = nx.Graph()
     node_coords = {}
     df_loop_merged = pd.DataFrame()
@@ -98,27 +98,31 @@ def load_data_v5():
         df_network.columns = df_network.columns.str.strip().str.upper()
         gdf_network.columns = [col.strip().upper() if col != 'geometry' else 'geometry' for col in gdf_network.columns]
         
-        geo_fid_col = [col for col in gdf_network.columns if col.endswith('TARGET_FID')][0]
+        geo_fid_col = [col for col in gdf_network.columns if 'FID' in col]
+        geo_fid_col = geo_fid_col[0] if geo_fid_col else gdf_network.columns[0]
         csv_fid_col = 'TARGET_FID' if 'TARGET_FID' in df_network.columns else df_network.columns[0]
         
-        df_network['MATCH_ID'] = pd.to_numeric(df_network[csv_fid_col], errors='coerce').fillna(-1).astype(int).astype(str)
-        gdf_network['MATCH_ID'] = pd.to_numeric(gdf_network[geo_fid_col], errors='coerce').fillna(-1).astype(int).astype(str)
+        def clean_id(x):
+            s = str(x).strip()
+            if s.endswith('.0'): s = s[:-2]
+            return s
+
+        df_network['MATCH_ID'] = df_network[csv_fid_col].apply(clean_id)
+        gdf_network['MATCH_ID'] = gdf_network[geo_fid_col].apply(clean_id)
         
         geom_dict = dict(zip(gdf_network['MATCH_ID'], gdf_network['geometry']))
         
         for _, row in df_network.iterrows():
-            fid = str(row['MATCH_ID'])
+            fid = row['MATCH_ID']
             smooth_geom = geom_dict.get(fid)
             length, wellness = row.get('SHAPE_LENGTH', 1), row.get('ROUTE_COST', 1)
             
-            # 💡 [핵심 버그 완벽 해결] CSV 좌표 무시! 오직 실제 그림(GeoJSON)의 양 끝점으로만 노드를 만듭니다.
             if smooth_geom and smooth_geom.geom_type == 'LineString':
                 start_c = smooth_geom.coords[0]
                 end_c = smooth_geom.coords[-1]
                 
-                # 소수점 5자리(약 1.1m)로 반올림하여 물리적으로 붙어있는 선들을 하나의 노드로 완벽히 결합
-                s_node = f"{round(start_c[0], 5)}_{round(start_c[1], 5)}"
-                e_node = f"{round(end_c[0], 5)}_{round(end_c[1], 5)}"
+                s_node = f"{round(start_c[0], 6)}_{round(start_c[1], 6)}"
+                e_node = f"{round(end_c[0], 6)}_{round(end_c[1], 6)}"
                 
                 G.add_edge(s_node, e_node, length=length, wellness=wellness, geom=smooth_geom)
                 node_coords[s_node] = start_c
@@ -128,7 +132,7 @@ def load_data_v5():
         if os.path.exists(file_name):
             df_routes = pd.read_csv(file_name)
             df_routes.columns = df_routes.columns.str.strip().str.upper()
-            df_routes['MATCH_ID'] = pd.to_numeric(df_routes.get('TARGET_FID', df_routes.iloc[:,0]), errors='coerce').fillna(-1).astype(int).astype(str)
+            df_routes['MATCH_ID'] = df_routes.get('TARGET_FID', df_routes.iloc[:,0]).apply(clean_id)
             df_loop_merged = pd.merge(df_routes, df_network, on='MATCH_ID', how='inner')
     except Exception as e: st.error(f"데이터 로드 실패: {e}")
 
@@ -136,7 +140,7 @@ def load_data_v5():
 
 with st.spinner("엔진 부팅 중..."):
     sd_boundary = load_boundary()
-    G, node_coords, df_loop_merged, geom_dict = load_data_v5()
+    G, node_coords, df_loop_merged, geom_dict = load_data_v7()
 
 def get_nearest_node(lon, lat):
     if not node_coords: return None
@@ -181,7 +185,8 @@ def calc_real_physical_distance(segments):
             total_dist += R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     return total_dist
 
-def get_pareto_optimal_path(G, source, target, min_ratio=1.2, max_ratio=2.0):
+# 💡 [핵심 반영!] 1.2배 강제 우회 금지 -> min_ratio=1.0 으로 변경!
+def get_pareto_optimal_path(G, source, target, min_ratio=1.0, max_ratio=2.0):
     try:
         shortest_path = nx.shortest_path(G, source=source, target=target, weight='length')
         min_dist = sum(G[u][v].get('length', 1) for u, v in zip(shortest_path[:-1], shortest_path[1:]))
@@ -311,7 +316,8 @@ elif st.session_state.page == 'step2_course':
                         s_node = get_nearest_node(hubs_info[seq[i]][1], hubs_info[seq[i]][0])
                         e_node = get_nearest_node(hubs_info[seq[i+1]][1], hubs_info[seq[i+1]][0])
                         try: 
-                            p_o = get_pareto_optimal_path(G, s_node, e_node, min_ratio=1.2, max_ratio=2.0)
+                            # 💡 호출 시에도 1.0 ~ 2.0으로 반영!
+                            p_o = get_pareto_optimal_path(G, s_node, e_node, min_ratio=1.0, max_ratio=2.0)
                             opt_segs.extend(extract_real_geometry(p_o))
                         except: pass
                         try: 
