@@ -5,10 +5,22 @@ import networkx as nx
 import requests
 import os
 import json
+import math
+import folium
+from streamlit_folium import st_folium
 import streamlit.components.v1 as components
 
-# --- 1. 페이지 기본 설정 ---
+# --- 1. 페이지 및 기본 데이터 설정 ---
 st.set_page_config(page_title="성동구 웰니스 러닝 경로", layout="wide")
+
+# 💡 날아갔던 거점(Hubs) 정보 복구 (만약 본인만의 좌표가 있었다면 여기를 수정해 주세요!)
+hubs_info = {
+    "서울숲 광장": [37.544387, 127.037442],
+    "뚝섬유원지": [37.531412, 127.067071],
+    "살곶이 체육공원": [37.558366, 127.045735],
+    "응봉산 팔각정": [37.550518, 127.032230]
+}
+hub_names = list(hubs_info.keys())
 
 # --- 2. 데이터 로드 엔진 ---
 @st.cache_data
@@ -68,6 +80,7 @@ def load_data():
 
     return G, node_coords, df_loop_merged, geom_dict
 
+# --- 3. 로직 함수 ---
 with st.spinner("엔진 부팅 중..."):
     sd_boundary = load_boundary()
     G, node_coords, df_loop_merged, geom_dict = load_data()
@@ -133,15 +146,10 @@ def get_pareto_optimal_path(G, source, target, min_ratio=1.2, max_ratio=2.0):
     except: return []
 
 # --- 4. 화면 제어 ---
-
-# (위쪽 코드들...)
-
 if 'page' not in st.session_state:
     st.session_state.page = 'step1_location'
 
 if st.session_state.page == 'step1_location':
-    # (내용)
-    
     st.markdown("""
         <div style="padding: 20px 20px 10px 20px; display: flex; justify-content: space-between; align-items: center;">
             <div style="display: flex; align-items: center; gap: 12px;">
@@ -291,15 +299,19 @@ elif st.session_state.page == 'step2_course':
             st.rerun()
 
 elif st.session_state.page == 'result':
-    app_json = json.dumps(st.session_state.approach_segments)
-    opt_json = json.dumps(st.session_state.main_opt_segments)
-    sho_json = json.dumps(st.session_state.main_sho_segments)
-    loop_json = json.dumps(st.session_state.loop_segments)
-    markers_json = json.dumps(st.session_state.marker_data)
-    boundary_json = json.dumps(sd_boundary) if sd_boundary else "null"
+    approach_segs = st.session_state.get('approach_segments', [])
+    opt_segs = st.session_state.get('main_opt_segments', [])
+    sho_segs = st.session_state.get('main_sho_segments', [])
+    loop_segs = st.session_state.get('loop_segments', [])
+    markers = st.session_state.get('marker_data', [])
     
-    u_lat, u_lon = st.session_state.user_location
-    mode = st.session_state.route_mode
+    dist_app = st.session_state.get('dist_app', 0)
+    dist_opt = st.session_state.get('dist_opt', 0)
+    dist_sho = st.session_state.get('dist_sho', 0)
+    dist_loop = st.session_state.get('dist_loop', 0)
+    
+    u_lat, u_lon = st.session_state.get('user_location', (37.55, 127.04))
+    mode = st.session_state.get('route_mode', 'A_TO_B')
 
     app_html = """
     <!DOCTYPE html>
@@ -327,11 +339,10 @@ elif st.session_state.page == 'result':
                 box-shadow: none !important;
                 color: #FFFFFF !important;
                 font-weight: 800 !important;
-                font-size: 10px !important; /* 💡 크기를 살짝 더 줄였습니다 */
+                font-size: 10px !important; 
                 text-shadow: 0 0 5px #000, 0 0 10px #000 !important;
                 margin-top: -12px !important;
 
-                /* 💡 가로 강제 유지 핵심 설정 */
                 white-space: nowrap !important;
                 display: inline-block !important;
                 width: 150px !important;
@@ -455,7 +466,7 @@ elif st.session_state.page == 'result':
         markers.forEach(m => {
             L.circleMarker([m.lat, m.lon], { color: m.color, radius: 7, fillOpacity: 1, weight: 2, fillColor: '#111' })
              .bindTooltip(
-                "&nbsp;&nbsp;&nbsp;" + m.name + "&nbsp;&nbsp;&nbsp;", /* 💡 가로 공백을 강제로 넣어서 브라우저가 공간을 확보하게 유도 */
+                "&nbsp;&nbsp;&nbsp;" + m.name + "&nbsp;&nbsp;&nbsp;", 
                 { 
                     permanent: true, 
                     direction: 'top', 
@@ -538,21 +549,19 @@ elif st.session_state.page == 'result':
     </html>
     """
     
-    # 생성된 HTML을 Streamlit 화면에 렌더링
     components.html(app_html.replace("___APP_JSON___", json.dumps(approach_segs))
                             .replace("___OPT_JSON___", json.dumps(opt_segs))
                             .replace("___SHO_JSON___", json.dumps(sho_segs))
                             .replace("___LOOP_JSON___", json.dumps(loop_segs))
                             .replace("___MARKERS_JSON___", json.dumps(markers))
-                            .replace("___BOUNDARY_JSON___", json.dumps(boundary_data) if boundary_data else "null")
+                            .replace("___BOUNDARY_JSON___", json.dumps(sd_boundary) if sd_boundary else "null")
                             .replace("___MODE___", mode)
                             .replace("___DIST_APP___", str(dist_app))
                             .replace("___DIST_OPT___", str(dist_opt))
                             .replace("___DIST_SHO___", str(dist_sho))
                             .replace("___DIST_LOOP___", str(dist_loop))
-                            .replace("___U_LAT___", str(user_lat))
-                            .replace("___U_LON___", str(user_lon)),
+                            .replace("___U_LAT___", str(u_lat))
+                            .replace("___U_LON___", str(u_lon)),
                     height=800)
-
 
     
