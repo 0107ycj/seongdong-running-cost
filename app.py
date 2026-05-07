@@ -44,7 +44,7 @@ st.markdown("""
         
         .stMarkdown h3 { color: #FFFFFF; padding: 20px 20px 10px 20px; font-size: 22px; font-weight: 800;}
         
-        /* 💡 [핵심 수정] 라디오 버튼 타이틀과 옵션 텍스트 분리 및 시인성 강화 */
+        /* 라디오 버튼 타이틀과 옵션 텍스트 분리 및 시인성 강화 */
         .stRadio > label { color: #8A8AA0 !important; font-size: 12px; margin-bottom: 5px; }
         div[role="radiogroup"] label p { color: #FFFFFF !important; font-weight: 700 !important; font-size: 15px !important; }
         
@@ -231,18 +231,18 @@ if st.session_state.page == 'step1_location':
     m = folium.Map(location=[37.55, 127.04], zoom_start=14, tiles=None, zoom_control=False)
     folium.TileLayer('CartoDB dark_matter', attr=' ').add_to(m)
     
-    # 💡 [핵심 수정] 시작 화면의 지도에도 글씨 크기 10px 및 강력한 가로 고정 CSS 주입
+    # 💡 [해결] 마커와 글씨 정렬 및 불필요한 하얀 꼬리표 완벽 제거
     css_injection = """
     <style>
         .leaflet-control-attribution { display: none !important; visibility: hidden !important; }
         .label-tooltip {
             background: transparent !important; border: none !important; box-shadow: none !important;
             color: #FFFFFF !important; font-weight: 800 !important; font-size: 10px !important;
-            text-shadow: 0 0 5px #000, 0 0 10px #000 !important; margin-top: -12px !important;
-            white-space: nowrap !important; display: inline-block !important; width: 150px !important;
-            min-width: 150px !important; text-align: center !important; margin-left: -75px !important;
-            overflow: visible !important; pointer-events: none;
+            text-shadow: 0 0 5px #000, 0 0 10px #000 !important; margin-top: -5px !important;
+            white-space: nowrap !important; text-align: center !important; pointer-events: none;
         }
+        /* 불필요한 하얀 말풍선 꼬리 숨기기 */
+        .label-tooltip::before, .label-tooltip::after { display: none !important; }
     </style>
     """
     m.get_root().header.add_child(folium.Element(css_injection))
@@ -251,10 +251,9 @@ if st.session_state.page == 'step1_location':
         folium.GeoJson(sd_boundary, style_function=lambda x: {'color': 'white', 'fillColor': 'transparent', 'weight': 2, 'opacity': 0.6, 'dashArray':'5,5'}).add_to(m)
 
     for name, coords in hubs_info.items():
-        # 💡 [핵심 수정] 팝업(클릭해야 뜸) 대신 항상 보이는 툴팁(Tooltip)으로 교체 및 가로 여백 추가
         marker = folium.CircleMarker(location=coords, radius=5, color='#00F5FF', fill=True, fillOpacity=0.8)
-        tooltip_html = f"&nbsp;&nbsp;&nbsp;{name}&nbsp;&nbsp;&nbsp;"
-        marker.add_child(folium.Tooltip(tooltip_html, permanent=True, direction='top', className='label-tooltip'))
+        # 💡 [해결] 억지 공백과 너비 조절 삭제 -> 자체 가운데 정렬 유도
+        marker.add_child(folium.Tooltip(name, permanent=True, direction='top', className='label-tooltip'))
         marker.add_to(m)
         
     map_data = st_folium(m, height=450, use_container_width=True)
@@ -397,15 +396,14 @@ elif st.session_state.page == 'result':
             .leaflet-control-attribution { display: none !important; }
             .leaflet-layer, .leaflet-control-zoom-in, .leaflet-control-zoom-out { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
             
-            /* 💡 결과 화면에도 똑같이 적용 (글씨 크기 10px & 가로 강제 고정) */
+            /* 💡 결과 화면에도 똑같이 적용 (글씨 10px, 가로 강제, 꼬리표 삭제) */
             .label-tooltip {
                 background: transparent !important; border: none !important; box-shadow: none !important;
                 color: #FFFFFF !important; font-weight: 800 !important; font-size: 10px !important;
-                text-shadow: 0 0 5px #000, 0 0 10px #000 !important; margin-top: -12px !important;
-                white-space: nowrap !important; display: inline-block !important; width: 150px !important;
-                min-width: 150px !important; text-align: center !important; margin-left: -75px !important;
-                overflow: visible !important; pointer-events: none;
+                text-shadow: 0 0 5px #000, 0 0 10px #000 !important; margin-top: -5px !important;
+                white-space: nowrap !important; text-align: center !important; pointer-events: none;
             }
+            .label-tooltip::before, .label-tooltip::after { display: none !important; }
 
             .bottom-sheet { 
                 position: absolute; bottom: 0; left: 0; width: 100%; 
@@ -521,8 +519,8 @@ elif st.session_state.page == 'result':
         markers.forEach(m => {
             L.circleMarker([m.lat, m.lon], { color: m.color, radius: 7, fillOpacity: 1, weight: 2, fillColor: '#111' })
              .bindTooltip(
-                "&nbsp;&nbsp;&nbsp;" + m.name + "&nbsp;&nbsp;&nbsp;", 
-                { permanent: true, direction: 'top', className: 'label-tooltip', offset: [0, -10], noHide: true }
+                m.name, 
+                { permanent: true, direction: 'top', className: 'label-tooltip', offset: [0, -5], noHide: true }
              )
              .addTo(map);
         });
