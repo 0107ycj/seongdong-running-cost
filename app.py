@@ -97,7 +97,11 @@ def load_data():
 
     try:
         df_network = pd.read_csv('soengdong_wellness_network.csv')
-        gdf_network = gpd.read_file('zip://soengdong_wellness_network.zip').to_crs(epsg=4326)
+        
+        if os.path.exists('soengdong_wellness_network.zip'):
+            gdf_network = gpd.read_file('zip://soengdong_wellness_network.zip').to_crs(epsg=4326)
+        else:
+            gdf_network = gpd.read_file('soengdong_wellness_network.geojson').to_crs(epsg=4326)
         
         df_network.columns = df_network.columns.str.strip().str.upper()
         gdf_network.columns = [col.strip().upper() if col != 'geometry' else 'geometry' for col in gdf_network.columns]
@@ -226,14 +230,32 @@ if st.session_state.page == 'step1_location':
     
     m = folium.Map(location=[37.55, 127.04], zoom_start=14, tiles=None, zoom_control=False)
     folium.TileLayer('CartoDB dark_matter', attr=' ').add_to(m)
-    css_injection = "<style>.leaflet-control-attribution { display: none !important; visibility: hidden !important; }</style>"
+    
+    # 💡 [핵심 수정] 시작 화면의 지도에도 글씨 크기 10px 및 강력한 가로 고정 CSS 주입
+    css_injection = """
+    <style>
+        .leaflet-control-attribution { display: none !important; visibility: hidden !important; }
+        .label-tooltip {
+            background: transparent !important; border: none !important; box-shadow: none !important;
+            color: #FFFFFF !important; font-weight: 800 !important; font-size: 10px !important;
+            text-shadow: 0 0 5px #000, 0 0 10px #000 !important; margin-top: -12px !important;
+            white-space: nowrap !important; display: inline-block !important; width: 150px !important;
+            min-width: 150px !important; text-align: center !important; margin-left: -75px !important;
+            overflow: visible !important; pointer-events: none;
+        }
+    </style>
+    """
     m.get_root().header.add_child(folium.Element(css_injection))
     
     if sd_boundary:
         folium.GeoJson(sd_boundary, style_function=lambda x: {'color': 'white', 'fillColor': 'transparent', 'weight': 2, 'opacity': 0.6, 'dashArray':'5,5'}).add_to(m)
 
     for name, coords in hubs_info.items():
-        folium.CircleMarker(location=coords, radius=5, color='#00F5FF', fill=True, fillOpacity=0.8, popup=name).add_to(m)
+        # 💡 [핵심 수정] 팝업(클릭해야 뜸) 대신 항상 보이는 툴팁(Tooltip)으로 교체 및 가로 여백 추가
+        marker = folium.CircleMarker(location=coords, radius=5, color='#00F5FF', fill=True, fillOpacity=0.8)
+        tooltip_html = f"&nbsp;&nbsp;&nbsp;{name}&nbsp;&nbsp;&nbsp;"
+        marker.add_child(folium.Tooltip(tooltip_html, permanent=True, direction='top', className='label-tooltip'))
+        marker.add_to(m)
         
     map_data = st_folium(m, height=450, use_container_width=True)
     
@@ -375,10 +397,14 @@ elif st.session_state.page == 'result':
             .leaflet-control-attribution { display: none !important; }
             .leaflet-layer, .leaflet-control-zoom-in, .leaflet-control-zoom-out { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
             
+            /* 💡 결과 화면에도 똑같이 적용 (글씨 크기 10px & 가로 강제 고정) */
             .label-tooltip {
-                background: transparent; border: none; box-shadow: none;
-                color: #FFF; font-weight: 800; font-size: 13px;
-                text-shadow: 0 0 5px #000, 0 0 10px #000; margin-top: -10px;
+                background: transparent !important; border: none !important; box-shadow: none !important;
+                color: #FFFFFF !important; font-weight: 800 !important; font-size: 10px !important;
+                text-shadow: 0 0 5px #000, 0 0 10px #000 !important; margin-top: -12px !important;
+                white-space: nowrap !important; display: inline-block !important; width: 150px !important;
+                min-width: 150px !important; text-align: center !important; margin-left: -75px !important;
+                overflow: visible !important; pointer-events: none;
             }
 
             .bottom-sheet { 
@@ -494,7 +520,10 @@ elif st.session_state.page == 'result':
 
         markers.forEach(m => {
             L.circleMarker([m.lat, m.lon], { color: m.color, radius: 7, fillOpacity: 1, weight: 2, fillColor: '#111' })
-             .bindTooltip(m.name, { permanent: true, direction: 'top', className: 'label-tooltip', offset: [0, -10] })
+             .bindTooltip(
+                "&nbsp;&nbsp;&nbsp;" + m.name + "&nbsp;&nbsp;&nbsp;", 
+                { permanent: true, direction: 'top', className: 'label-tooltip', offset: [0, -10], noHide: true }
+             )
              .addTo(map);
         });
 
