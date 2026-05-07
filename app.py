@@ -80,8 +80,9 @@ def load_boundary():
         return {'type': 'FeatureCollection', 'features': [f for f in seoul_geo['features'] if f['properties']['name'] == '성동구']}
     except: return None
 
+# 💡 [핵심 버그 수정 1] 서버 강제 초기화를 위해 함수 이름을 _v3 로 변경
 @st.cache_resource
-def load_data():
+def load_data_v3():
     G = nx.Graph()
     node_coords = {}
     df_loop_merged = pd.DataFrame()
@@ -107,20 +108,18 @@ def load_data():
         geom_dict = dict(zip(gdf_network[geo_fid_col], gdf_network['geometry']))
         
         for _, row in df_network.iterrows():
+            # 💡 [핵심 버그 수정 2] 원본 데이터의 좌표를 전혀 자르지 않고(문자열 그대로) 연결하여 지그재그(Wormhole) 차단!
+            s_node = f"{row['START_X']}_{row['START_Y']}"
+            e_node = f"{row['END_X']}_{row['END_Y']}"
+            
             fid = str(row[csv_fid_col])
             smooth_geom = geom_dict.get(fid)
             length, wellness = row.get('SHAPE_LENGTH', 1), row.get('ROUTE_COST', 1)
             
-            # 💡 [버그 방지 1] 노드를 미세하게(소수점 5자리, 약 1.1m) 스냅하여 단절된 도로망 연결
+            G.add_edge(s_node, e_node, length=length, wellness=wellness, geom=smooth_geom)
             if smooth_geom and smooth_geom.geom_type == 'LineString':
-                start_coord = smooth_geom.coords[0]
-                end_coord = smooth_geom.coords[-1]
-                s_node = f"{start_coord[0]:.5f}_{start_coord[1]:.5f}"
-                e_node = f"{end_coord[0]:.5f}_{end_coord[1]:.5f}"
-                
-                G.add_edge(s_node, e_node, length=length, wellness=wellness, geom=smooth_geom)
-                node_coords[s_node] = start_coord
-                node_coords[e_node] = end_coord
+                node_coords[s_node] = smooth_geom.coords[0]
+                node_coords[e_node] = smooth_geom.coords[-1]
                 
         file_name = 'Seongdong_Loop_Routes_3k_5k (1).csv'
         if os.path.exists(file_name):
@@ -134,7 +133,7 @@ def load_data():
 
 with st.spinner("엔진 부팅 중..."):
     sd_boundary = load_boundary()
-    G, node_coords, df_loop_merged, geom_dict = load_data()
+    G, node_coords, df_loop_merged, geom_dict = load_data_v3() # 💡 V3 로드
 
 def get_nearest_node(lon, lat):
     if not node_coords: return None
@@ -151,15 +150,14 @@ def extract_real_geometry(path):
         if geom and geom.geom_type == 'LineString':
             coords = [[lat, lon] for lon, lat in geom.coords]
             
-            # 💡 [버그 방지 2 - 핵심] 지그재그 텔레포트 현상 완벽 해결! 
-            # 내가 지나가는 방향이 선이 그려진 방향과 반대라면, 배열을 뒤집어서 매끄럽게 연결합니다.
+            # 방향 정렬 검사 (시작점이 꼬이지 않게)
             u_coord = node_coords.get(u)
             if u_coord:
                 u_lon, u_lat = u_coord
                 dist_to_start = (coords[0][0] - u_lat)**2 + (coords[0][1] - u_lon)**2
                 dist_to_end = (coords[-1][0] - u_lat)**2 + (coords[-1][1] - u_lon)**2
                 if dist_to_end < dist_to_start:
-                    coords.reverse() # 역방향 주행 시 선분 뒤집기!
+                    coords.reverse()
                     
             segments.append(coords)
     return segments
@@ -351,7 +349,6 @@ elif st.session_state.page == 'step2_course':
                             geom = geom_dict.get(fid)
                             if geom and geom.geom_type == 'LineString':
                                 coords = [[lat, lon] for lon, lat in geom.coords]
-                                # 방향 보정
                                 u_lon_hub, u_lat_hub = hubs_info[start_hub][1], hubs_info[start_hub][0]
                                 if len(l_segs) > 0:
                                     prev_end = l_segs[-1][-1]
