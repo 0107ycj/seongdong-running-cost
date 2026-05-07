@@ -21,13 +21,8 @@ st.markdown("""
         footer { display: none !important; }
         iframe { border: none !important; width: 100% !important; border-radius: 0 0 24px 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         
-        /* 입력창(Selectbox, Radio) 좌우 여백 확보 (잘림 방지) */
-        div[data-testid="stSelectbox"], div[data-testid="stRadio"] { 
-            padding: 0 20px !important; 
-            box-sizing: border-box; 
-        }
+        div[data-testid="stSelectbox"], div[data-testid="stRadio"] { padding: 0 20px !important; box-sizing: border-box; }
         
-        /* 버튼 디자인 차별화 및 고급화 */
         div.stButton { padding: 0 20px !important; }
         div.stButton > button { width: 100%; border-radius: 16px !important; font-weight: 800 !important; transition: 0.3s; display: flex; justify-content: center;}
         
@@ -43,11 +38,8 @@ st.markdown("""
         }
         
         .stMarkdown h3 { color: #FFFFFF; padding: 20px 20px 10px 20px; font-size: 22px; font-weight: 800;}
-        
-        /* 라디오 버튼 타이틀과 옵션 텍스트 분리 및 시인성 강화 */
         .stRadio > label { color: #8A8AA0 !important; font-size: 12px; margin-bottom: 5px; }
         div[role="radiogroup"] label p { color: #FFFFFF !important; font-weight: 700 !important; font-size: 15px !important; }
-        
         .stSelectbox > label { color: #8A8AA0; font-size: 12px; margin-bottom: -5px;}
     </style>
 """, unsafe_allow_html=True)
@@ -117,17 +109,14 @@ def load_data():
         for _, row in df_network.iterrows():
             fid = str(row[csv_fid_col])
             smooth_geom = geom_dict.get(fid)
-            length = row.get('SHAPE_LENGTH', 1)
-            wellness = row.get('ROUTE_COST', 1)
+            length, wellness = row.get('SHAPE_LENGTH', 1), row.get('ROUTE_COST', 1)
             
-            # 💡 [핵심 해결] CSV 좌표 대신, 지도에 그려진 실제 선의 양 끝점을 초정밀(.6f)로 가져와 연결
+            # 💡 [버그 방지 1] 노드를 미세하게(소수점 5자리, 약 1.1m) 스냅하여 단절된 도로망 연결
             if smooth_geom and smooth_geom.geom_type == 'LineString':
                 start_coord = smooth_geom.coords[0]
                 end_coord = smooth_geom.coords[-1]
-                
-                # 소수점 6자리(약 11cm 정밀도)로 노드 이름을 만들어 다리 위 끊김 현상 완벽 방지
-                s_node = f"{start_coord[0]:.6f}_{start_coord[1]:.6f}"
-                e_node = f"{end_coord[0]:.6f}_{end_coord[1]:.6f}"
+                s_node = f"{start_coord[0]:.5f}_{start_coord[1]:.5f}"
+                e_node = f"{end_coord[0]:.5f}_{end_coord[1]:.5f}"
                 
                 G.add_edge(s_node, e_node, length=length, wellness=wellness, geom=smooth_geom)
                 node_coords[s_node] = start_coord
@@ -160,7 +149,19 @@ def extract_real_geometry(path):
     for u, v in zip(path[:-1], path[1:]):
         geom = G.get_edge_data(u, v).get('geom')
         if geom and geom.geom_type == 'LineString':
-            segments.append([[lat, lon] for lon, lat in geom.coords])
+            coords = [[lat, lon] for lon, lat in geom.coords]
+            
+            # 💡 [버그 방지 2 - 핵심] 지그재그 텔레포트 현상 완벽 해결! 
+            # 내가 지나가는 방향이 선이 그려진 방향과 반대라면, 배열을 뒤집어서 매끄럽게 연결합니다.
+            u_coord = node_coords.get(u)
+            if u_coord:
+                u_lon, u_lat = u_coord
+                dist_to_start = (coords[0][0] - u_lat)**2 + (coords[0][1] - u_lon)**2
+                dist_to_end = (coords[-1][0] - u_lat)**2 + (coords[-1][1] - u_lon)**2
+                if dist_to_end < dist_to_start:
+                    coords.reverse() # 역방향 주행 시 선분 뒤집기!
+                    
+            segments.append(coords)
     return segments
 
 def calc_real_physical_distance(segments):
@@ -210,7 +211,6 @@ def get_pareto_optimal_path(G, source, target, min_ratio=1.2, max_ratio=2.0):
 # --- 4. 화면 제어 ---
 
 if st.session_state.page == 'step1_location':
-    
     st.markdown("""
         <div style="padding: 20px 20px 10px 20px; display: flex; justify-content: space-between; align-items: center;">
             <div style="display: flex; align-items: center; gap: 12px;">
@@ -224,7 +224,6 @@ if st.session_state.page == 'step1_location':
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
             </div>
         </div>
-        
         <div style="margin: 5px 20px 20px 20px; background: linear-gradient(135deg, rgba(0,245,255,0.15) 0%, rgba(0,0,0,0) 100%); border: 1px solid rgba(0,245,255,0.2); border-radius: 20px; padding: 22px; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
             <div style="position: absolute; right: -15px; bottom: -20px; font-size: 110px; opacity: 0.1; transform: rotate(-15deg);">👟</div>
             <h2 style="margin: 0 0 8px 0; color: #FFF; font-size: 26px; font-weight: 900; letter-spacing: -1px;">Ready to Run?</h2>
@@ -237,11 +236,9 @@ if st.session_state.page == 'step1_location':
     """, unsafe_allow_html=True)
     
     st.markdown("<div style='padding: 0 20px;'>", unsafe_allow_html=True)
-    
     m = folium.Map(location=[37.55, 127.04], zoom_start=14, tiles=None, zoom_control=False)
     folium.TileLayer('CartoDB dark_matter', attr=' ').add_to(m)
     
-    # 💡 [해결] 마커와 글씨 정렬 및 불필요한 하얀 꼬리표 완벽 제거
     css_injection = """
     <style>
         .leaflet-control-attribution { display: none !important; visibility: hidden !important; }
@@ -251,7 +248,6 @@ if st.session_state.page == 'step1_location':
             text-shadow: 0 0 5px #000, 0 0 10px #000 !important; margin-top: -5px !important;
             white-space: nowrap !important; text-align: center !important; pointer-events: none;
         }
-        /* 불필요한 하얀 말풍선 꼬리 숨기기 */
         .label-tooltip::before, .label-tooltip::after { display: none !important; }
     </style>
     """
@@ -262,12 +258,10 @@ if st.session_state.page == 'step1_location':
 
     for name, coords in hubs_info.items():
         marker = folium.CircleMarker(location=coords, radius=5, color='#00F5FF', fill=True, fillOpacity=0.8)
-        # 💡 [해결] 억지 공백과 너비 조절 삭제 -> 자체 가운데 정렬 유도
         marker.add_child(folium.Tooltip(name, permanent=True, direction='top', className='label-tooltip'))
         marker.add_to(m)
         
     map_data = st_folium(m, height=450, use_container_width=True)
-    
     st.markdown("</div>", unsafe_allow_html=True)
     
     if map_data and map_data.get('last_clicked'):
@@ -279,7 +273,6 @@ if st.session_state.page == 'step1_location':
 
 elif st.session_state.page == 'step2_course':
     st.markdown("<h3>🏃‍♂️ 러닝 코스</h3>", unsafe_allow_html=True)
-    
     with st.container():
         start_hub = st.selectbox("📍 출발 거점", hub_names, index=hub_names.index(st.session_state.nearest_hub))
         mode = st.radio("코스 모드", ["🚩 다른 거점으로 이동 (A to B)", "🔄 순환형 코스 (Loop)"])
@@ -357,7 +350,18 @@ elif st.session_state.page == 'step2_course':
                             fid = str(row['TARGET_FID'])
                             geom = geom_dict.get(fid)
                             if geom and geom.geom_type == 'LineString':
-                                l_segs.append([[lat, lon] for lon, lat in geom.coords])
+                                coords = [[lat, lon] for lon, lat in geom.coords]
+                                # 방향 보정
+                                u_lon_hub, u_lat_hub = hubs_info[start_hub][1], hubs_info[start_hub][0]
+                                if len(l_segs) > 0:
+                                    prev_end = l_segs[-1][-1]
+                                    u_lat_hub, u_lon_hub = prev_end[0], prev_end[1]
+                                
+                                dist_to_start = (coords[0][0] - u_lat_hub)**2 + (coords[0][1] - u_lon_hub)**2
+                                dist_to_end = (coords[-1][0] - u_lat_hub)**2 + (coords[-1][1] - u_lon_hub)**2
+                                if dist_to_end < dist_to_start:
+                                    coords.reverse()
+                                l_segs.append(coords)
                                 
                         st.session_state.loop_segments = l_segs
                         st.session_state.dist_app = calc_real_physical_distance(st.session_state.approach_segments)
@@ -406,7 +410,6 @@ elif st.session_state.page == 'result':
             .leaflet-control-attribution { display: none !important; }
             .leaflet-layer, .leaflet-control-zoom-in, .leaflet-control-zoom-out { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
             
-            /* 💡 결과 화면에도 똑같이 적용 (글씨 10px, 가로 강제, 꼬리표 삭제) */
             .label-tooltip {
                 background: transparent !important; border: none !important; box-shadow: none !important;
                 color: #FFFFFF !important; font-weight: 800 !important; font-size: 10px !important;
@@ -420,10 +423,9 @@ elif st.session_state.page == 'result':
                 background: var(--bg-elevated); backdrop-filter: blur(20px); border-top: 1px solid rgba(255, 255, 255, 0.1); 
                 border-radius: 32px 32px 0 0; z-index: 100; padding: 25px; box-sizing: border-box;
                 max-height: 55vh; overflow-y: auto;
-                -ms-overflow-style: none; /* IE and Edge */
-                scrollbar-width: none; /* Firefox */
+                -ms-overflow-style: none; scrollbar-width: none;
             }
-            .bottom-sheet::-webkit-scrollbar { display: none; } /* Chrome, Safari, Opera */
+            .bottom-sheet::-webkit-scrollbar { display: none; }
             
             .toggle-panel { display: flex; gap: 10px; margin-bottom: 15px; }
             .toggle-btn { flex: 1; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: #FFF; padding: 10px; border-radius: 12px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;}
