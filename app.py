@@ -115,13 +115,23 @@ def load_data():
         geom_dict = dict(zip(gdf_network[geo_fid_col], gdf_network['geometry']))
         
         for _, row in df_network.iterrows():
-            s_node, e_node = f"{row['START_X']:.1f}_{row['START_Y']:.1f}", f"{row['END_X']:.1f}_{row['END_Y']:.1f}"
-            fid, smooth_geom = str(row[csv_fid_col]), geom_dict.get(str(row[csv_fid_col]))
-            length, wellness = row.get('SHAPE_LENGTH', 1), row.get('ROUTE_COST', 1)
+            fid = str(row[csv_fid_col])
+            smooth_geom = geom_dict.get(fid)
+            length = row.get('SHAPE_LENGTH', 1)
+            wellness = row.get('ROUTE_COST', 1)
             
-            G.add_edge(s_node, e_node, length=length, wellness=wellness, geom=smooth_geom)
+            # 💡 [핵심 해결] CSV 좌표 대신, 지도에 그려진 실제 선의 양 끝점을 초정밀(.6f)로 가져와 연결
             if smooth_geom and smooth_geom.geom_type == 'LineString':
-                node_coords[s_node], node_coords[e_node] = smooth_geom.coords[0], smooth_geom.coords[-1]
+                start_coord = smooth_geom.coords[0]
+                end_coord = smooth_geom.coords[-1]
+                
+                # 소수점 6자리(약 11cm 정밀도)로 노드 이름을 만들어 다리 위 끊김 현상 완벽 방지
+                s_node = f"{start_coord[0]:.6f}_{start_coord[1]:.6f}"
+                e_node = f"{end_coord[0]:.6f}_{end_coord[1]:.6f}"
+                
+                G.add_edge(s_node, e_node, length=length, wellness=wellness, geom=smooth_geom)
+                node_coords[s_node] = start_coord
+                node_coords[e_node] = end_coord
                 
         file_name = 'Seongdong_Loop_Routes_3k_5k (1).csv'
         if os.path.exists(file_name):
