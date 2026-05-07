@@ -80,9 +80,8 @@ def load_boundary():
         return {'type': 'FeatureCollection', 'features': [f for f in seoul_geo['features'] if f['properties']['name'] == '성동구']}
     except: return None
 
-# 💡 [핵심 버그 수정 1] 서버 강제 초기화를 위해 함수 이름을 _v3 로 변경
 @st.cache_resource
-def load_data_v3():
+def load_data_v4():
     G = nx.Graph()
     node_coords = {}
     df_loop_merged = pd.DataFrame()
@@ -102,17 +101,18 @@ def load_data_v3():
         geo_fid_col = [col for col in gdf_network.columns if col.endswith('TARGET_FID')][0]
         csv_fid_col = 'TARGET_FID' if 'TARGET_FID' in df_network.columns else df_network.columns[0]
         
-        df_network[csv_fid_col] = df_network[csv_fid_col].astype(str)
-        gdf_network[geo_fid_col] = gdf_network[geo_fid_col].astype(str)
+        # 💡 [버그 수정 1] ID 매칭 오류 완벽 해결 (1.0과 1을 같게 처리)
+        df_network['MATCH_ID'] = pd.to_numeric(df_network[csv_fid_col], errors='coerce').fillna(-1).astype(int).astype(str)
+        gdf_network['MATCH_ID'] = pd.to_numeric(gdf_network[geo_fid_col], errors='coerce').fillna(-1).astype(int).astype(str)
         
-        geom_dict = dict(zip(gdf_network[geo_fid_col], gdf_network['geometry']))
+        geom_dict = dict(zip(gdf_network['MATCH_ID'], gdf_network['geometry']))
         
         for _, row in df_network.iterrows():
-            # 💡 [핵심 버그 수정 2] 원본 데이터의 좌표를 전혀 자르지 않고(문자열 그대로) 연결하여 지그재그(Wormhole) 차단!
+            # 💡 [핵심 버그 수정 2] 소수점 1자리(.1f)로 잘라서 도로망이 다 엉키던 현상(지그재그)을 원본 좌표 그대로 써서 완벽 차단!
             s_node = f"{row['START_X']}_{row['START_Y']}"
             e_node = f"{row['END_X']}_{row['END_Y']}"
             
-            fid = str(row[csv_fid_col])
+            fid = str(row['MATCH_ID'])
             smooth_geom = geom_dict.get(fid)
             length, wellness = row.get('SHAPE_LENGTH', 1), row.get('ROUTE_COST', 1)
             
@@ -125,15 +125,15 @@ def load_data_v3():
         if os.path.exists(file_name):
             df_routes = pd.read_csv(file_name)
             df_routes.columns = df_routes.columns.str.strip().str.upper()
-            df_routes['TARGET_FID'] = df_routes['TARGET_FID'].astype(str)
-            df_loop_merged = pd.merge(df_routes, df_network, on='TARGET_FID', how='inner')
+            df_routes['MATCH_ID'] = pd.to_numeric(df_routes.get('TARGET_FID', df_routes.iloc[:,0]), errors='coerce').fillna(-1).astype(int).astype(str)
+            df_loop_merged = pd.merge(df_routes, df_network, on='MATCH_ID', how='inner')
     except Exception as e: st.error(f"데이터 로드 실패: {e}")
 
     return G, node_coords, df_loop_merged, geom_dict
 
 with st.spinner("엔진 부팅 중..."):
     sd_boundary = load_boundary()
-    G, node_coords, df_loop_merged, geom_dict = load_data_v3() # 💡 V3 로드
+    G, node_coords, df_loop_merged, geom_dict = load_data_v4()
 
 def get_nearest_node(lon, lat):
     if not node_coords: return None
@@ -143,24 +143,28 @@ def get_nearest_hub(lat, lon):
     return min(hubs_info.keys(), key=lambda h: math.sqrt((hubs_info[h][0]-lat)**2 + (hubs_info[h][1]-lon)**2))
 
 def extract_real_geometry(path):
-    segments = []
-    if not path: return segments
+    flat_coords = []
+    if not path: return [flat_coords]
     for u, v in zip(path[:-1], path[1:]):
         geom = G.get_edge_data(u, v).get('geom')
         if geom and geom.geom_type == 'LineString':
             coords = [[lat, lon] for lon, lat in geom.coords]
             
-            # 방향 정렬 검사 (시작점이 꼬이지 않게)
+            # 💡 [핵심 버그 수정 3] 역주행 방지! 역방향으로 지도를 그리면 선이 지그재그로 튀는 현상 해결
             u_coord = node_coords.get(u)
             if u_coord:
                 u_lon, u_lat = u_coord
-                dist_to_start = (coords[0][0] - u_lat)**2 + (coords[0][1] - u_lon)**2
-                dist_to_end = (coords[-1][0] - u_lat)**2 + (coords[-1][1] - u_lon)**2
-                if dist_to_end < dist_to_start:
+                dist_start = (coords[0][0] - u_lat)**2 + (coords[0][1] - u_lon)**2
+                dist_end = (coords[-1][0] - u_lat)**2 + (coords[-1][1] - u_lon)**2
+                if dist_end < dist_start:
                     coords.reverse()
-                    
-            segments.append(coords)
-    return segments
+            
+            # 부드러운 일직선으로 선들을 하나로 합침
+            if flat_coords and flat_coords[-1] == coords[0]:
+                flat_coords.extend(coords[1:])
+            else:
+                flat_coords.extend(coords)
+    return [flat_coords] if flat_coords else []
 
 def calc_real_physical_distance(segments):
     total_dist = 0
@@ -209,6 +213,7 @@ def get_pareto_optimal_path(G, source, target, min_ratio=1.2, max_ratio=2.0):
 # --- 4. 화면 제어 ---
 
 if st.session_state.page == 'step1_location':
+    
     st.markdown("""
         <div style="padding: 20px 20px 10px 20px; display: flex; justify-content: space-between; align-items: center;">
             <div style="display: flex; align-items: center; gap: 12px;">
@@ -222,6 +227,7 @@ if st.session_state.page == 'step1_location':
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
             </div>
         </div>
+        
         <div style="margin: 5px 20px 20px 20px; background: linear-gradient(135deg, rgba(0,245,255,0.15) 0%, rgba(0,0,0,0) 100%); border: 1px solid rgba(0,245,255,0.2); border-radius: 20px; padding: 22px; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
             <div style="position: absolute; right: -15px; bottom: -20px; font-size: 110px; opacity: 0.1; transform: rotate(-15deg);">👟</div>
             <h2 style="margin: 0 0 8px 0; color: #FFF; font-size: 26px; font-weight: 900; letter-spacing: -1px;">Ready to Run?</h2>
@@ -234,6 +240,7 @@ if st.session_state.page == 'step1_location':
     """, unsafe_allow_html=True)
     
     st.markdown("<div style='padding: 0 20px;'>", unsafe_allow_html=True)
+    
     m = folium.Map(location=[37.55, 127.04], zoom_start=14, tiles=None, zoom_control=False)
     folium.TileLayer('CartoDB dark_matter', attr=' ').add_to(m)
     
@@ -260,6 +267,7 @@ if st.session_state.page == 'step1_location':
         marker.add_to(m)
         
     map_data = st_folium(m, height=450, use_container_width=True)
+    
     st.markdown("</div>", unsafe_allow_html=True)
     
     if map_data and map_data.get('last_clicked'):
@@ -271,6 +279,7 @@ if st.session_state.page == 'step1_location':
 
 elif st.session_state.page == 'step2_course':
     st.markdown("<h3>🏃‍♂️ 러닝 코스</h3>", unsafe_allow_html=True)
+    
     with st.container():
         start_hub = st.selectbox("📍 출발 거점", hub_names, index=hub_names.index(st.session_state.nearest_hub))
         mode = st.radio("코스 모드", ["🚩 다른 거점으로 이동 (A to B)", "🔄 순환형 코스 (Loop)"])
@@ -358,9 +367,9 @@ elif st.session_state.page == 'step2_course':
                                 dist_to_end = (coords[-1][0] - u_lat_hub)**2 + (coords[-1][1] - u_lon_hub)**2
                                 if dist_to_end < dist_to_start:
                                     coords.reverse()
-                                l_segs.append(coords)
+                                l_segs.extend(coords) # 순환코스도 부드럽게 하나로 합치기
                                 
-                        st.session_state.loop_segments = l_segs
+                        st.session_state.loop_segments = [l_segs] if l_segs else []
                         st.session_state.dist_app = calc_real_physical_distance(st.session_state.approach_segments)
                         st.session_state.dist_loop = calc_real_physical_distance(st.session_state.loop_segments)
                         st.session_state.route_mode = "LOOP"
