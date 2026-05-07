@@ -81,7 +81,7 @@ def load_boundary():
     except: return None
 
 @st.cache_resource
-def load_data_v4():
+def load_data_v5():
     G = nx.Graph()
     node_coords = {}
     df_loop_merged = pd.DataFrame()
@@ -101,25 +101,28 @@ def load_data_v4():
         geo_fid_col = [col for col in gdf_network.columns if col.endswith('TARGET_FID')][0]
         csv_fid_col = 'TARGET_FID' if 'TARGET_FID' in df_network.columns else df_network.columns[0]
         
-        # 💡 [버그 수정 1] ID 매칭 오류 완벽 해결 (1.0과 1을 같게 처리)
         df_network['MATCH_ID'] = pd.to_numeric(df_network[csv_fid_col], errors='coerce').fillna(-1).astype(int).astype(str)
         gdf_network['MATCH_ID'] = pd.to_numeric(gdf_network[geo_fid_col], errors='coerce').fillna(-1).astype(int).astype(str)
         
         geom_dict = dict(zip(gdf_network['MATCH_ID'], gdf_network['geometry']))
         
         for _, row in df_network.iterrows():
-            # 💡 [핵심 버그 수정 2] 소수점 1자리(.1f)로 잘라서 도로망이 다 엉키던 현상(지그재그)을 원본 좌표 그대로 써서 완벽 차단!
-            s_node = f"{row['START_X']}_{row['START_Y']}"
-            e_node = f"{row['END_X']}_{row['END_Y']}"
-            
             fid = str(row['MATCH_ID'])
             smooth_geom = geom_dict.get(fid)
             length, wellness = row.get('SHAPE_LENGTH', 1), row.get('ROUTE_COST', 1)
             
-            G.add_edge(s_node, e_node, length=length, wellness=wellness, geom=smooth_geom)
+            # 💡 [핵심 버그 완벽 해결] CSV 좌표 무시! 오직 실제 그림(GeoJSON)의 양 끝점으로만 노드를 만듭니다.
             if smooth_geom and smooth_geom.geom_type == 'LineString':
-                node_coords[s_node] = smooth_geom.coords[0]
-                node_coords[e_node] = smooth_geom.coords[-1]
+                start_c = smooth_geom.coords[0]
+                end_c = smooth_geom.coords[-1]
+                
+                # 소수점 5자리(약 1.1m)로 반올림하여 물리적으로 붙어있는 선들을 하나의 노드로 완벽히 결합
+                s_node = f"{round(start_c[0], 5)}_{round(start_c[1], 5)}"
+                e_node = f"{round(end_c[0], 5)}_{round(end_c[1], 5)}"
+                
+                G.add_edge(s_node, e_node, length=length, wellness=wellness, geom=smooth_geom)
+                node_coords[s_node] = start_c
+                node_coords[e_node] = end_c
                 
         file_name = 'Seongdong_Loop_Routes_3k_5k (1).csv'
         if os.path.exists(file_name):
@@ -133,7 +136,7 @@ def load_data_v4():
 
 with st.spinner("엔진 부팅 중..."):
     sd_boundary = load_boundary()
-    G, node_coords, df_loop_merged, geom_dict = load_data_v4()
+    G, node_coords, df_loop_merged, geom_dict = load_data_v5()
 
 def get_nearest_node(lon, lat):
     if not node_coords: return None
@@ -150,7 +153,6 @@ def extract_real_geometry(path):
         if geom and geom.geom_type == 'LineString':
             coords = [[lat, lon] for lon, lat in geom.coords]
             
-            # 💡 [핵심 버그 수정 3] 역주행 방지! 역방향으로 지도를 그리면 선이 지그재그로 튀는 현상 해결
             u_coord = node_coords.get(u)
             if u_coord:
                 u_lon, u_lat = u_coord
@@ -159,7 +161,6 @@ def extract_real_geometry(path):
                 if dist_end < dist_start:
                     coords.reverse()
             
-            # 부드러운 일직선으로 선들을 하나로 합침
             if flat_coords and flat_coords[-1] == coords[0]:
                 flat_coords.extend(coords[1:])
             else:
@@ -354,7 +355,7 @@ elif st.session_state.page == 'step2_course':
                         target_data = df_loop_merged[df_loop_merged['ROUTE_ID'] == selected_loop]
                         l_segs = []
                         for _, row in target_data.iterrows():
-                            fid = str(row['TARGET_FID'])
+                            fid = str(row['MATCH_ID'])
                             geom = geom_dict.get(fid)
                             if geom and geom.geom_type == 'LineString':
                                 coords = [[lat, lon] for lon, lat in geom.coords]
@@ -367,7 +368,7 @@ elif st.session_state.page == 'step2_course':
                                 dist_to_end = (coords[-1][0] - u_lat_hub)**2 + (coords[-1][1] - u_lon_hub)**2
                                 if dist_to_end < dist_to_start:
                                     coords.reverse()
-                                l_segs.extend(coords) # 순환코스도 부드럽게 하나로 합치기
+                                l_segs.extend(coords)
                                 
                         st.session_state.loop_segments = [l_segs] if l_segs else []
                         st.session_state.dist_app = calc_real_physical_distance(st.session_state.approach_segments)
