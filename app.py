@@ -97,7 +97,7 @@ def load_data():
 
     try:
         df_network = pd.read_csv('soengdong_wellness_network.csv')
-        gdf_network = gpd.read_file('soengdong_wellness_network.geojson').to_crs(epsg=4326)
+        gdf_network = gpd.read_file('zip://soengdong_wellness_network.zip').to_crs(epsg=4326)
         
         df_network.columns = df_network.columns.str.strip().str.upper()
         gdf_network.columns = [col.strip().upper() if col != 'geometry' else 'geometry' for col in gdf_network.columns]
