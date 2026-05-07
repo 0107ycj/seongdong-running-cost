@@ -134,7 +134,13 @@ def get_pareto_optimal_path(G, source, target, min_ratio=1.2, max_ratio=2.0):
 
 # --- 4. 화면 제어 ---
 
+# (위쪽 코드들...)
+
+if 'page' not in st.session_state:
+    st.session_state.page = 'step1_location'
+
 if st.session_state.page == 'step1_location':
+    # (내용)
     
     st.markdown("""
         <div style="padding: 20px 20px 10px 20px; display: flex; justify-content: space-between; align-items: center;">
