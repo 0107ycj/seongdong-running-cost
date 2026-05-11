@@ -71,7 +71,13 @@ hubs_info = {
 }
 hub_names = list(hubs_info.keys())
 
-# --- 3. 데이터 로드 엔진 ---
+# ==========================================
+# 💡 여기서부터 복사해서 덮어씌워 주세요! 
+# (# --- 3. 데이터 로드 엔진 --- 부분부터 대체)
+# ==========================================
+
+criteria_cols = ['교차로', '보도폭', '대기질', '유동인구', '보도재질', '교통사고', 'CCTV', '녹지및그늘', '편의점', '경사', '하천', '신호등', '소음']
+
 @st.cache_data
 def load_boundary():
     try:
@@ -89,7 +95,6 @@ def load_data():
 
     try:
         df_network = pd.read_csv('soengdong_wellness_network.csv')
-        
         if os.path.exists('soengdong_wellness_network.zip'):
             gdf_network = gpd.read_file('zip://soengdong_wellness_network.zip').to_crs(epsg=4326)
         else:
@@ -98,8 +103,7 @@ def load_data():
         df_network.columns = df_network.columns.str.strip().str.upper()
         gdf_network.columns = [col.strip().upper() if col != 'geometry' else 'geometry' for col in gdf_network.columns]
         
-        geo_fid_col = [col for col in gdf_network.columns if 'FID' in col]
-        geo_fid_col = geo_fid_col[0] if geo_fid_col else gdf_network.columns[0]
+        geo_fid_col = [col for col in gdf_network.columns if col.endswith('TARGET_FID')][0]
         csv_fid_col = 'TARGET_FID' if 'TARGET_FID' in df_network.columns else df_network.columns[0]
         
         def clean_id(x):
@@ -112,21 +116,23 @@ def load_data():
         
         geom_dict = dict(zip(gdf_network['MATCH_ID'], gdf_network['geometry']))
         
+        # 💡 [복구 1] 코랩과 완벽하게 동일한 .1f 네트워크 결합 방식으로 원상 복구 (웜홀 방지)
         for _, row in df_network.iterrows():
-            fid = row['MATCH_ID']
+            s_node = f"{row['START_X']:.1f}_{row['START_Y']:.1f}"
+            e_node = f"{row['END_X']:.1f}_{row['END_Y']:.1f}"
+            fid = str(row['MATCH_ID'])
             smooth_geom = geom_dict.get(fid)
-            length, wellness = row.get('SHAPE_LENGTH', 1), row.get('ROUTE_COST', 1)
             
-            if smooth_geom and smooth_geom.geom_type == 'LineString':
-                start_c = smooth_geom.coords[0]
-                end_c = smooth_geom.coords[-1]
-                
-                s_node = f"{round(start_c[0], 6)}_{round(start_c[1], 6)}"
-                e_node = f"{round(end_c[0], 6)}_{round(end_c[1], 6)}"
-                
-                G.add_edge(s_node, e_node, length=length, wellness=wellness, geom=smooth_geom)
-                node_coords[s_node] = start_c
-                node_coords[e_node] = end_c
+            shape_len = row.get('SHAPE_LENGTH', 1)
+            cost_val = row.get('ROUTE_COST', shape_len)
+            
+            attr_dict = {c: row[c] if c in df_network.columns else 0 for c in criteria_cols}
+            G.add_edge(s_node, e_node, length=shape_len, wellness=cost_val, geom=smooth_geom, **attr_dict)
+            
+            if smooth_geom is not None and smooth_geom.geom_type == 'LineString':
+                coords = list(smooth_geom.coords)
+                node_coords[s_node] = coords[0]
+                node_coords[e_node] = coords[-1]
                 
         file_name = 'Seongdong_Loop_Routes_3k_5k (1).csv'
         if os.path.exists(file_name):
@@ -149,27 +155,15 @@ def get_nearest_node(lon, lat):
 def get_nearest_hub(lat, lon):
     return min(hubs_info.keys(), key=lambda h: math.sqrt((hubs_info[h][0]-lat)**2 + (hubs_info[h][1]-lon)**2))
 
+# 💡 [복구 2] 억지로 선을 잇지 않고, 코랩처럼 도로 블록들을 각각 따로 지도에 넘겨주도록 변경 (지그재그 방지)
 def extract_real_geometry(path):
-    flat_coords = []
-    if not path: return [flat_coords]
+    segments = []
+    if not path: return segments
     for u, v in zip(path[:-1], path[1:]):
         geom = G.get_edge_data(u, v).get('geom')
         if geom and geom.geom_type == 'LineString':
-            coords = [[lat, lon] for lon, lat in geom.coords]
-            
-            u_coord = node_coords.get(u)
-            if u_coord:
-                u_lon, u_lat = u_coord
-                dist_start = (coords[0][0] - u_lat)**2 + (coords[0][1] - u_lon)**2
-                dist_end = (coords[-1][0] - u_lat)**2 + (coords[-1][1] - u_lon)**2
-                if dist_end < dist_start:
-                    coords.reverse()
-            
-            if flat_coords and flat_coords[-1] == coords[0]:
-                flat_coords.extend(coords[1:])
-            else:
-                flat_coords.extend(coords)
-    return [flat_coords] if flat_coords else []
+            segments.append([[lat, lon] for lon, lat in geom.coords])
+    return segments
 
 def calc_real_physical_distance(segments):
     total_dist = 0
@@ -185,17 +179,31 @@ def calc_real_physical_distance(segments):
             total_dist += R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     return total_dist
 
-# 💡 [핵심] 다시 1.2배 우회를 살렸습니다! 
-# 최소 1.2배 ~ 최대 2.0배 사이에서 가장 웰니스(쾌적도) 점수가 높은 경로를 탐색합니다.
-def get_pareto_optimal_path(G, source, target, min_ratio=1.2, max_ratio=2.0):
+def get_stats_for_segment(path):
+    length = 0
+    stats = {c: 0.0 for c in criteria_cols}
+    if not path or len(path) < 2: return length, stats
+    for u, v in zip(path[:-1], path[1:]):
+        d = G.get_edge_data(u, v)
+        l = d.get('length', 0)
+        length += l
+        for c in criteria_cols:
+            val = d.get(c, 0)
+            if pd.isna(val): val = 0
+            stats[c] += val * l
+    return length, stats
+
+# 💡 [복구 3] 1.2배 강제 우회를 삭제하고, 코랩과 동일한 쾌적도 비교 알고리즘으로 완벽 복구
+def get_pareto_optimal_path(G, source, target, min_ratio=1.0, max_ratio=1.5):
     try:
         shortest_path = nx.shortest_path(G, source=source, target=target, weight='length')
         min_dist = sum(G[u][v].get('length', 1) for u, v in zip(shortest_path[:-1], shortest_path[1:]))
         if min_dist == 0: return shortest_path
 
-        min_allowed_dist = min_dist * min_ratio
         max_allowed_dist = min_dist * max_ratio
-        
+        s_len, s_stats = get_stats_for_segment(shortest_path)
+        s_avg = {c: (s_stats[c] / s_len if s_len > 0 else 0) for c in criteria_cols}
+
         candidate_paths = []
         for step in range(21):
             alpha = step * 0.05
@@ -203,20 +211,30 @@ def get_pareto_optimal_path(G, source, target, min_ratio=1.2, max_ratio=2.0):
             try:
                 path = nx.shortest_path(G, source=source, target=target, weight=weight_func)
                 path_len = sum(G[u][v].get('length', 1) for u, v in zip(path[:-1], path[1:]))
+                path_well = sum(G[u][v].get('wellness', 1) for u, v in zip(path[:-1], path[1:]))
                 if path_len <= max_allowed_dist:
-                    path_well = sum(G[u][v].get('wellness', 1) for u, v in zip(path[:-1], path[1:]))
-                    candidate_paths.append({'path': path, 'length': path_len, 'wellness': path_well})
+                    if not any(c['path'] == path for c in candidate_paths):
+                        candidate_paths.append({'path': path, 'length': path_len, 'wellness': path_well})
             except: continue
             
-        if candidate_paths:
-            filtered_cands = [c for c in candidate_paths if c['length'] >= min_allowed_dist]
-            if filtered_cands:
-                return min(filtered_cands, key=lambda x: x['wellness'])['path']
-            else:
-                return max(candidate_paths, key=lambda x: x['length'])['path']
+        valid_candidates = []
+        for cand in candidate_paths:
+            c_len, c_stats = get_stats_for_segment(cand['path'])
+            if c_len == 0: continue
+            improvement_score = sum((c_stats[c] / c_len) - s_avg[c] for c in criteria_cols)
+            if improvement_score >= -0.01:
+                valid_candidates.append(cand)
+                
+        if valid_candidates:
+            best_candidate = min(valid_candidates, key=lambda x: x['wellness'])
+            return best_candidate['path']
         return shortest_path
     except: return []
 
+# ==========================================
+# 💡 여기까지 복사 끝! 
+# 이 아래부터는 기존의 # --- 4. 화면 제어 --- 가 있어야 합니다.
+# ==========================================
 # --- 4. 화면 제어 ---
 
 if st.session_state.page == 'step1_location':
@@ -317,8 +335,8 @@ elif st.session_state.page == 'step2_course':
                         s_node = get_nearest_node(hubs_info[seq[i]][1], hubs_info[seq[i]][0])
                         e_node = get_nearest_node(hubs_info[seq[i+1]][1], hubs_info[seq[i+1]][0])
                         try: 
-                            # 💡 호출 시에도 1.2배 ~ 2.0배 우회 옵션 적용!
-                            p_o = get_pareto_optimal_path(G, s_node, e_node, min_ratio=1.2, max_ratio=2.0)
+                            # 💡 호출 시에도 1.0 ~ 2.0으로 반영!
+                            p_o = get_pareto_optimal_path(G, s_node, e_node, min_ratio=1.0, max_ratio=2.0)
                             opt_segs.extend(extract_real_geometry(p_o))
                         except: pass
                         try: 
