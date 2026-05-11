@@ -202,7 +202,7 @@ def get_stats_for_segment(path):
             stats[c] += val * l
     return length, stats, well
 
-p_o = get_pareto_optimal_path(G, s_node, e_node, min_ratio=1.0, max_ratio=1.5)
+def get_pareto_optimal_path(G, source, target, min_ratio=1.0, max_ratio=1.5):
     try:
         shortest_path = nx.shortest_path(G, source=source, target=target, weight='length')
         min_dist = sum(G[u][v].get('length', 1) for u, v in zip(shortest_path[:-1], shortest_path[1:]))
