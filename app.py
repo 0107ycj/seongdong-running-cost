@@ -44,6 +44,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# 💡 [추가] 13개 세부 지표 리스트
+criteria_cols = ['교차로', '보도폭', '대기질', '유동인구', '보도재질', '교통사고', 'CCTV', '녹지및그늘', '편의점', '경사', '하천', '신호등', '소음']
+
 # --- 2. 상태 관리 ---
 if 'page' not in st.session_state: st.session_state.page = 'step1_location'
 if 'user_location' not in st.session_state: st.session_state.user_location = None
@@ -61,6 +64,14 @@ if 'dist_opt' not in st.session_state: st.session_state.dist_opt = 0
 if 'dist_sho' not in st.session_state: st.session_state.dist_sho = 0
 if 'dist_loop' not in st.session_state: st.session_state.dist_loop = 0
 
+# 💡 [추가] 상태 관리에 세부 지표 데이터 추가
+if 'opt_stats' not in st.session_state: st.session_state.opt_stats = {c: 0.0 for c in criteria_cols}
+if 'sho_stats' not in st.session_state: st.session_state.sho_stats = {c: 0.0 for c in criteria_cols}
+if 'opt_len' not in st.session_state: st.session_state.opt_len = 0
+if 'sho_len' not in st.session_state: st.session_state.sho_len = 0
+if 'opt_well' not in st.session_state: st.session_state.opt_well = 0
+if 'sho_well' not in st.session_state: st.session_state.sho_well = 0
+
 hubs_info = {
     "옥수역": (37.5413498, 127.0171347), "왕십리역": (37.5616302, 127.0351177),
     "금호나들목": (37.5512902, 127.0356081), "성덕정나들목": (37.5375776, 127.0454704),
@@ -71,13 +82,7 @@ hubs_info = {
 }
 hub_names = list(hubs_info.keys())
 
-# ==========================================
-# 💡 여기서부터 복사해서 덮어씌워 주세요! 
-# (# --- 3. 데이터 로드 엔진 --- 부분부터 대체)
-# ==========================================
-
-criteria_cols = ['교차로', '보도폭', '대기질', '유동인구', '보도재질', '교통사고', 'CCTV', '녹지및그늘', '편의점', '경사', '하천', '신호등', '소음']
-
+# --- 3. 데이터 로드 엔진 ---
 @st.cache_data
 def load_boundary():
     try:
@@ -116,7 +121,6 @@ def load_data():
         
         geom_dict = dict(zip(gdf_network['MATCH_ID'], gdf_network['geometry']))
         
-        # 💡 [복구 1] 코랩과 완벽하게 동일한 .1f 네트워크 결합 방식으로 원상 복구 (웜홀 방지)
         for _, row in df_network.iterrows():
             s_node = f"{row['START_X']:.1f}_{row['START_Y']:.1f}"
             e_node = f"{row['END_X']:.1f}_{row['END_Y']:.1f}"
@@ -126,6 +130,7 @@ def load_data():
             shape_len = row.get('SHAPE_LENGTH', 1)
             cost_val = row.get('ROUTE_COST', shape_len)
             
+            # 💡 [추가] 13개 지표 가중치도 엣지에 저장
             attr_dict = {c: row[c] if c in df_network.columns else 0 for c in criteria_cols}
             G.add_edge(s_node, e_node, length=shape_len, wellness=cost_val, geom=smooth_geom, **attr_dict)
             
@@ -155,7 +160,6 @@ def get_nearest_node(lon, lat):
 def get_nearest_hub(lat, lon):
     return min(hubs_info.keys(), key=lambda h: math.sqrt((hubs_info[h][0]-lat)**2 + (hubs_info[h][1]-lon)**2))
 
-# 💡 [복구 2] 억지로 선을 잇지 않고, 코랩처럼 도로 블록들을 각각 따로 지도에 넘겨주도록 변경 (지그재그 방지)
 def extract_real_geometry(path):
     segments = []
     if not path: return segments
@@ -179,31 +183,34 @@ def calc_real_physical_distance(segments):
             total_dist += R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     return total_dist
 
+# 💡 [추가] 경로의 세부 지표 누적합을 구하는 함수
 def get_stats_for_segment(path):
     length = 0
     stats = {c: 0.0 for c in criteria_cols}
-    if not path or len(path) < 2: return length, stats
+    well = 0.0
+    if not path or len(path) < 2: return length, stats, well
     for u, v in zip(path[:-1], path[1:]):
         d = G.get_edge_data(u, v)
+        if not d: continue
         l = d.get('length', 0)
+        w = d.get('wellness', l)
         length += l
+        well += w
         for c in criteria_cols:
             val = d.get(c, 0)
             if pd.isna(val): val = 0
             stats[c] += val * l
-    return length, stats
+    return length, stats, well
 
-# 💡 [복구 3] 1.2배 강제 우회를 삭제하고, 코랩과 동일한 쾌적도 비교 알고리즘으로 완벽 복구
-def get_pareto_optimal_path(G, source, target, min_ratio=1.0, max_ratio=1.5):
+def get_pareto_optimal_path(G, source, target, min_ratio=1.2, max_ratio=2.0):
     try:
         shortest_path = nx.shortest_path(G, source=source, target=target, weight='length')
         min_dist = sum(G[u][v].get('length', 1) for u, v in zip(shortest_path[:-1], shortest_path[1:]))
         if min_dist == 0: return shortest_path
 
+        min_allowed_dist = min_dist * min_ratio
         max_allowed_dist = min_dist * max_ratio
-        s_len, s_stats = get_stats_for_segment(shortest_path)
-        s_avg = {c: (s_stats[c] / s_len if s_len > 0 else 0) for c in criteria_cols}
-
+        
         candidate_paths = []
         for step in range(21):
             alpha = step * 0.05
@@ -211,30 +218,20 @@ def get_pareto_optimal_path(G, source, target, min_ratio=1.0, max_ratio=1.5):
             try:
                 path = nx.shortest_path(G, source=source, target=target, weight=weight_func)
                 path_len = sum(G[u][v].get('length', 1) for u, v in zip(path[:-1], path[1:]))
-                path_well = sum(G[u][v].get('wellness', 1) for u, v in zip(path[:-1], path[1:]))
                 if path_len <= max_allowed_dist:
-                    if not any(c['path'] == path for c in candidate_paths):
-                        candidate_paths.append({'path': path, 'length': path_len, 'wellness': path_well})
+                    path_well = sum(G[u][v].get('wellness', 1) for u, v in zip(path[:-1], path[1:]))
+                    candidate_paths.append({'path': path, 'length': path_len, 'wellness': path_well})
             except: continue
             
-        valid_candidates = []
-        for cand in candidate_paths:
-            c_len, c_stats = get_stats_for_segment(cand['path'])
-            if c_len == 0: continue
-            improvement_score = sum((c_stats[c] / c_len) - s_avg[c] for c in criteria_cols)
-            if improvement_score >= -0.01:
-                valid_candidates.append(cand)
-                
-        if valid_candidates:
-            best_candidate = min(valid_candidates, key=lambda x: x['wellness'])
-            return best_candidate['path']
+        if candidate_paths:
+            filtered_cands = [c for c in candidate_paths if c['length'] >= min_allowed_dist]
+            if filtered_cands:
+                return min(filtered_cands, key=lambda x: x['wellness'])['path']
+            else:
+                return max(candidate_paths, key=lambda x: x['length'])['path']
         return shortest_path
     except: return []
 
-# ==========================================
-# 💡 여기까지 복사 끝! 
-# 이 아래부터는 기존의 # --- 4. 화면 제어 --- 가 있어야 합니다.
-# ==========================================
 # --- 4. 화면 제어 ---
 
 if st.session_state.page == 'step1_location':
@@ -331,17 +328,31 @@ elif st.session_state.page == 'step2_course':
                     except: st.session_state.approach_segments = []
                     
                     opt_segs, sho_segs = [], []
+                    
+                    # 💡 [추가] 세부 지표 분석을 위한 누적 데이터 변수
+                    opt_len_acc, sho_len_acc = 0, 0
+                    opt_well_acc, sho_well_acc = 0, 0
+                    opt_stats_acc = {c: 0.0 for c in criteria_cols}
+                    sho_stats_acc = {c: 0.0 for c in criteria_cols}
+                    
                     for i in range(len(seq)-1):
                         s_node = get_nearest_node(hubs_info[seq[i]][1], hubs_info[seq[i]][0])
                         e_node = get_nearest_node(hubs_info[seq[i+1]][1], hubs_info[seq[i+1]][0])
+                        
                         try: 
-                            # 💡 호출 시에도 1.0 ~ 2.0으로 반영!
-                            p_o = get_pareto_optimal_path(G, s_node, e_node, min_ratio=1.0, max_ratio=2.0)
+                            p_o = get_pareto_optimal_path(G, s_node, e_node, min_ratio=1.2, max_ratio=2.0)
                             opt_segs.extend(extract_real_geometry(p_o))
+                            l, s, w = get_stats_for_segment(p_o)
+                            opt_len_acc += l; opt_well_acc += w
+                            for c in criteria_cols: opt_stats_acc[c] += s[c]
                         except: pass
+                        
                         try: 
                             p_s = nx.shortest_path(G, s_node, e_node, 'length')
                             sho_segs.extend(extract_real_geometry(p_s))
+                            l, s, w = get_stats_for_segment(p_s)
+                            sho_len_acc += l; sho_well_acc += w
+                            for c in criteria_cols: sho_stats_acc[c] += s[c]
                         except: pass
                         
                     st.session_state.main_opt_segments = opt_segs
@@ -351,6 +362,14 @@ elif st.session_state.page == 'step2_course':
                     st.session_state.dist_opt = calc_real_physical_distance(st.session_state.main_opt_segments)
                     st.session_state.dist_sho = calc_real_physical_distance(st.session_state.main_sho_segments)
                     st.session_state.route_mode = "A_TO_B"
+                    
+                    # 💡 [추가] 계산된 지표 세션을 상태에 저장
+                    st.session_state.opt_stats = opt_stats_acc
+                    st.session_state.sho_stats = sho_stats_acc
+                    st.session_state.opt_len = opt_len_acc
+                    st.session_state.sho_len = sho_len_acc
+                    st.session_state.opt_well = opt_well_acc
+                    st.session_state.sho_well = sho_well_acc
                     
                     markers = [{"name": "현 위치", "lat": u_lat, "lon": u_lon, "color": "#FF9500"}]
                     for h in set(seq): markers.append({"name": h, "lat": hubs_info[h][0], "lon": hubs_info[h][1], "color": "#00F5FF" if h==start_hub else "#FF2D78"})
@@ -383,19 +402,9 @@ elif st.session_state.page == 'step2_course':
                             fid = str(row['MATCH_ID'])
                             geom = geom_dict.get(fid)
                             if geom and geom.geom_type == 'LineString':
-                                coords = [[lat, lon] for lon, lat in geom.coords]
-                                u_lon_hub, u_lat_hub = hubs_info[start_hub][1], hubs_info[start_hub][0]
-                                if len(l_segs) > 0:
-                                    prev_end = l_segs[-1][-1]
-                                    u_lat_hub, u_lon_hub = prev_end[0], prev_end[1]
+                                l_segs.append([[lat, lon] for lon, lat in geom.coords])
                                 
-                                dist_to_start = (coords[0][0] - u_lat_hub)**2 + (coords[0][1] - u_lon_hub)**2
-                                dist_to_end = (coords[-1][0] - u_lat_hub)**2 + (coords[-1][1] - u_lon_hub)**2
-                                if dist_to_end < dist_to_start:
-                                    coords.reverse()
-                                l_segs.extend(coords)
-                                
-                        st.session_state.loop_segments = [l_segs] if l_segs else []
+                        st.session_state.loop_segments = l_segs
                         st.session_state.dist_app = calc_real_physical_distance(st.session_state.approach_segments)
                         st.session_state.dist_loop = calc_real_physical_distance(st.session_state.loop_segments)
                         st.session_state.route_mode = "LOOP"
@@ -419,6 +428,14 @@ elif st.session_state.page == 'result':
     loop_json = json.dumps(st.session_state.loop_segments)
     markers_json = json.dumps(st.session_state.marker_data)
     boundary_json = json.dumps(sd_boundary) if sd_boundary else "null"
+    
+    # 💡 [추가] 13개 데이터 JS 전달용 JSON 포맷
+    opt_stats_json = json.dumps(st.session_state.get('opt_stats', {c: 0.0 for c in criteria_cols}))
+    sho_stats_json = json.dumps(st.session_state.get('sho_stats', {c: 0.0 for c in criteria_cols}))
+    opt_len_val = st.session_state.get('opt_len', 0)
+    sho_len_val = st.session_state.get('sho_len', 0)
+    opt_well_val = st.session_state.get('opt_well', 0)
+    sho_well_val = st.session_state.get('sho_well', 0)
     
     u_lat, u_lon = st.session_state.user_location
     mode = st.session_state.route_mode
@@ -454,7 +471,7 @@ elif st.session_state.page == 'result':
                 position: absolute; bottom: 0; left: 0; width: 100%; 
                 background: var(--bg-elevated); backdrop-filter: blur(20px); border-top: 1px solid rgba(255, 255, 255, 0.1); 
                 border-radius: 32px 32px 0 0; z-index: 100; padding: 25px; box-sizing: border-box;
-                max-height: 55vh; overflow-y: auto;
+                max-height: 60vh; overflow-y: auto;
                 -ms-overflow-style: none; scrollbar-width: none;
             }
             .bottom-sheet::-webkit-scrollbar { display: none; }
@@ -468,16 +485,22 @@ elif st.session_state.page == 'result':
             .stat-val { font-size: 18px; font-weight: 900; color: #FFF; margin-top: 5px; }
             .stat-label { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
 
-            .compare-btn { width: 100%; background: rgba(255,45,120,0.1); border: 1px solid var(--neon-pink); color: var(--neon-pink); padding: 12px; border-radius: 12px; font-weight: bold; font-size: 14px; margin-bottom: 15px; cursor: pointer; transition: 0.3s;}
-            .compare-btn:hover { background: var(--neon-pink); color: #FFF; }
-
-            .compare-modal { display: none; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 15px; }
+            .compare-modal { display: block; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 15px; }
             .comp-row { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 8px 0; font-size: 13px; }
             .comp-row:last-child { border: none; }
             .comp-col { width: 33%; text-align: center; }
 
+            .compare-btn { width: 100%; background: rgba(255,45,120,0.1); border: 1px solid var(--neon-pink); color: var(--neon-pink); padding: 12px; border-radius: 12px; font-weight: bold; font-size: 14px; margin-bottom: 15px; cursor: pointer; transition: 0.3s;}
+            .compare-btn:hover { background: var(--neon-pink); color: #FFF; }
+
             .primary-btn { background: linear-gradient(135deg, #00F5FF, #0080FF); color: #000; font-weight: 900; font-size: 16px; border: none; border-radius: 16px; padding: 16px; width: 100%; cursor: pointer;}
             .btn-back { position: absolute; top: 20px; left: 20px; z-index: 2000; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 10px 15px; border-radius: 12px; cursor: pointer; font-weight: bold;}
+            
+            /* 💡 [추가] 세부 모달 애니메이션 및 디자인 */
+            .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; backdrop-filter: blur(5px); }
+            .modal-content { background: var(--bg-elevated); border: 1px solid var(--neon-cyan); border-radius: 20px; width: 100%; max-width: 400px; max-height: 85vh; padding: 20px; overflow-y: auto; color: #FFF; box-shadow: 0 10px 30px rgba(0,245,255,0.2);}
+            .modal-content::-webkit-scrollbar { display: none; }
+            .table-row { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding: 10px 0; font-size: 13px;}
         </style>
     </head>
     <body>
@@ -506,7 +529,10 @@ elif st.session_state.page == 'result':
         </div>
 
         <div id="compare-section" style="display: none;">
-            <button class="compare-btn" onclick="toggleCompare()">📊 최적/최단 경로 상세 비교</button>
+            <div id="imp-text" style="text-align: center; color: var(--neon-cyan); font-size: 13px; font-weight: 800; margin-bottom: 12px; background: rgba(0, 245, 255, 0.1); padding: 10px; border-radius: 12px; border: 1px solid rgba(0,245,255,0.3);">
+                ✨ 계산 중...
+            </div>
+            
             <div class="compare-modal" id="compare-modal">
                 <div class="comp-row" style="font-weight: 800; border-bottom: 1px solid #444; padding-bottom: 10px;">
                     <div class="comp-col">항목</div>
@@ -529,9 +555,30 @@ elif st.session_state.page == 'result':
                     <div class="comp-col" id="cmp-k-s" style="font-weight:bold;">--</div>
                 </div>
             </div>
+            
+            <button class="compare-btn" onclick="openDetailsModal()">📊 13가지 가중치 웰니스 지수 상세 분석</button>
         </div>
 
         <button class="primary-btn">START RUNNING</button>
+    </div>
+    
+    <div id="details-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 style="margin-top: 0; text-align: center; font-weight: 900; letter-spacing: -0.5px;">🌱 웰니스 지수 변화량</h3>
+            <p style="text-align:center; color: var(--text-secondary); font-size: 11px; margin-bottom: 20px;">각 지표별 1m당 평균 수치 비교입니다.</p>
+            
+            <div class="table-row" style="font-weight: 800; border-bottom: 2px solid #555; color: var(--text-secondary);">
+                <div style="width: 30%;">항목</div>
+                <div style="width: 20%; text-align:center;">최단</div>
+                <div style="width: 25%; text-align:center; color: var(--neon-cyan);">웰니스</div>
+                <div style="width: 25%; text-align:right;">증감</div>
+            </div>
+            
+            <div id="details-table-body">
+                </div>
+            
+            <button class="primary-btn" style="margin-top: 20px; background: rgba(255,255,255,0.1); color: #FFF;" onclick="closeDetailsModal()">닫기</button>
+        </div>
     </div>
 
     <script>
@@ -547,6 +594,15 @@ elif st.session_state.page == 'result':
         var dOpt = ___DIST_OPT___;
         var dSho = ___DIST_SHO___;
         var dLoop = ___DIST_LOOP___;
+        
+        // 💡 [추가] JS에서 사용할 상세 지표
+        var optStats = ___OPT_STATS_JSON___;
+        var shoStats = ___SHO_STATS_JSON___;
+        var optLen = ___OPT_LEN_VAL___;
+        var shoLen = ___SHO_LEN_VAL___;
+        var optWell = ___OPT_WELL_VAL___;
+        var shoWell = ___SHO_WELL_VAL___;
+        var criteria = ['교차로', '보도폭', '대기질', '유동인구', '보도재질', '교통사고', 'CCTV', '녹지및그늘', '편의점', '경사', '하천', '신호등', '소음'];
 
         var map = L.map('map', { zoomControl: false, attributionControl: false }).setView([___U_LAT___, ___U_LON___], 15);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
@@ -578,6 +634,40 @@ elif st.session_state.page == 'result':
                 L.polyline(optSegs, { color: '#00F5FF', weight: 14, opacity: 0.15 }).addTo(mainLayer);
                 L.polyline(optSegs, { color: '#00F5FF', weight: 6, opacity: 1.0 }).addTo(mainLayer);
             }
+            
+            // 💡 [추가] 퍼센트 및 모달 데이터 초기 렌더링
+            var impPct = 0;
+            if (shoWell > 0 && shoWell > optWell) {
+                impPct = ((shoWell - optWell) / shoWell) * 100;
+            }
+            var impDiv = document.getElementById('imp-text');
+            if (impPct > 0) {
+                impDiv.innerHTML = "✨ 최단 경로보다 <b>약 " + Math.round(impPct) + "%</b> 더 쾌적한 웰니스 코스입니다!";
+            } else {
+                impDiv.innerHTML = "✨ 최단 거리이면서 동시에 최고의 웰니스 코스입니다!";
+            }
+            
+            var tbody = document.getElementById("details-table-body");
+            criteria.forEach(function(c) {
+                var o_val = optLen > 0 ? (optStats[c] / optLen) : 0;
+                var s_val = shoLen > 0 ? (shoStats[c] / shoLen) : 0;
+                var diff = o_val - s_val;
+                
+                var diffStr = "-";
+                if (Math.abs(diff) > 0.01) {
+                    if (diff > 0) diffStr = "<span style='color:#39FF14; font-weight:bold;'>▲ " + diff.toFixed(2) + "</span>";
+                    else diffStr = "<span style='color:#FF2D78; font-weight:bold;'>▼ " + Math.abs(diff).toFixed(2) + "</span>";
+                }
+
+                var tr = "<div class='table-row'>" +
+                         "<div style='width: 30%; font-weight:bold;'>" + c + "</div>" +
+                         "<div style='width: 20%; text-align:center; color: var(--text-secondary);'>" + s_val.toFixed(2) + "</div>" +
+                         "<div style='width: 25%; text-align:center; color: var(--neon-cyan); font-weight:bold;'>" + o_val.toFixed(2) + "</div>" +
+                         "<div style='width: 25%; text-align:right;'>" + diffStr + "</div>" +
+                         "</div>";
+                tbody.insertAdjacentHTML('beforeend', tr);
+            });
+            
         } else if (mode === "LOOP") {
             if (loopSegs.length > 0) {
                 L.polyline(loopSegs, { color: '#39FF14', weight: 14, opacity: 0.15 }).addTo(mainLayer);
@@ -617,12 +707,9 @@ elif st.session_state.page == 'result':
             document.getElementById('val-dist').innerText = st.km;
             document.getElementById('val-time').innerText = st.mins;
             document.getElementById('val-kcal').innerText = st.kcal;
-        }
-        
-        function toggleCompare() {
-            let mod = document.getElementById('compare-modal');
-            mod.style.display = mod.style.display === 'none' ? 'block' : 'none';
-            if(mod.style.display === 'block') {
+            
+            // 💡 [추가] 비교표 수치도 실시간 반영
+            if(mode === "A_TO_B") {
                 let o = calc(dOpt), s = calc(dSho);
                 document.getElementById('cmp-d-o').innerText = o.km;
                 document.getElementById('cmp-d-s').innerText = s.km;
@@ -632,6 +719,10 @@ elif st.session_state.page == 'result':
                 document.getElementById('cmp-k-s').innerText = s.kcal;
             }
         }
+        
+        // 💡 [추가] 모달 제어 자바스크립트
+        function openDetailsModal() { document.getElementById('details-modal').style.display = 'flex'; }
+        function closeDetailsModal() { document.getElementById('details-modal').style.display = 'none'; }
         
         updateStats();
     </script>
@@ -652,5 +743,13 @@ elif st.session_state.page == 'result':
     app_html = app_html.replace("___DIST_OPT___", str(st.session_state.dist_opt))
     app_html = app_html.replace("___DIST_SHO___", str(st.session_state.dist_sho))
     app_html = app_html.replace("___DIST_LOOP___", str(st.session_state.dist_loop))
+    
+    # 💡 [추가] JSON 데이터 주입
+    app_html = app_html.replace("___OPT_STATS_JSON___", opt_stats_json)
+    app_html = app_html.replace("___SHO_STATS_JSON___", sho_stats_json)
+    app_html = app_html.replace("___OPT_LEN_VAL___", str(opt_len_val))
+    app_html = app_html.replace("___SHO_LEN_VAL___", str(sho_len_val))
+    app_html = app_html.replace("___OPT_WELL_VAL___", str(opt_well_val))
+    app_html = app_html.replace("___SHO_WELL_VAL___", str(sho_well_val))
 
     components.html(app_html, height=900, scrolling=False)
