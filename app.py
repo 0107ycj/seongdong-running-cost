@@ -44,7 +44,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 💡 [추가] 13개 세부 지표 리스트
 criteria_cols = ['교차로', '보도폭', '대기질', '유동인구', '보도재질', '교통사고', 'CCTV', '녹지및그늘', '편의점', '경사', '하천', '신호등', '소음']
 
 # --- 2. 상태 관리 ---
@@ -64,7 +63,6 @@ if 'dist_opt' not in st.session_state: st.session_state.dist_opt = 0
 if 'dist_sho' not in st.session_state: st.session_state.dist_sho = 0
 if 'dist_loop' not in st.session_state: st.session_state.dist_loop = 0
 
-# 💡 [추가] 상태 관리에 세부 지표 데이터 추가
 if 'opt_stats' not in st.session_state: st.session_state.opt_stats = {c: 0.0 for c in criteria_cols}
 if 'sho_stats' not in st.session_state: st.session_state.sho_stats = {c: 0.0 for c in criteria_cols}
 if 'opt_len' not in st.session_state: st.session_state.opt_len = 0
@@ -130,7 +128,6 @@ def load_data():
             shape_len = row.get('SHAPE_LENGTH', 1)
             cost_val = row.get('ROUTE_COST', shape_len)
             
-            # 💡 [추가] 13개 지표 가중치도 엣지에 저장
             attr_dict = {c: row[c] if c in df_network.columns else 0 for c in criteria_cols}
             G.add_edge(s_node, e_node, length=shape_len, wellness=cost_val, geom=smooth_geom, **attr_dict)
             
@@ -183,7 +180,6 @@ def calc_real_physical_distance(segments):
             total_dist += R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     return total_dist
 
-# 💡 [추가] 경로의 세부 지표 누적합을 구하는 함수
 def get_stats_for_segment(path):
     length = 0
     stats = {c: 0.0 for c in criteria_cols}
@@ -202,7 +198,8 @@ def get_stats_for_segment(path):
             stats[c] += val * l
     return length, stats, well
 
-def get_pareto_optimal_path(G, source, target, min_ratio=1.2, max_ratio=2.0):
+# 💡 [핵심 해결] min_ratio=1.0으로 수정! 억지 우회를 없애고 최단 거리가 최적일 땐 최단을 따름
+def get_pareto_optimal_path(G, source, target, min_ratio=1.0, max_ratio=2.0):
     try:
         shortest_path = nx.shortest_path(G, source=source, target=target, weight='length')
         min_dist = sum(G[u][v].get('length', 1) for u, v in zip(shortest_path[:-1], shortest_path[1:]))
@@ -329,7 +326,6 @@ elif st.session_state.page == 'step2_course':
                     
                     opt_segs, sho_segs = [], []
                     
-                    # 💡 [추가] 세부 지표 분석을 위한 누적 데이터 변수
                     opt_len_acc, sho_len_acc = 0, 0
                     opt_well_acc, sho_well_acc = 0, 0
                     opt_stats_acc = {c: 0.0 for c in criteria_cols}
@@ -340,7 +336,8 @@ elif st.session_state.page == 'step2_course':
                         e_node = get_nearest_node(hubs_info[seq[i+1]][1], hubs_info[seq[i+1]][0])
                         
                         try: 
-                            p_o = get_pareto_optimal_path(G, s_node, e_node, min_ratio=1.2, max_ratio=2.0)
+                            # 💡 [핵심 해결 2] 탐색 호출 시에도 min_ratio=1.0 으로 적용
+                            p_o = get_pareto_optimal_path(G, s_node, e_node, min_ratio=1.0, max_ratio=2.0)
                             opt_segs.extend(extract_real_geometry(p_o))
                             l, s, w = get_stats_for_segment(p_o)
                             opt_len_acc += l; opt_well_acc += w
@@ -363,7 +360,6 @@ elif st.session_state.page == 'step2_course':
                     st.session_state.dist_sho = calc_real_physical_distance(st.session_state.main_sho_segments)
                     st.session_state.route_mode = "A_TO_B"
                     
-                    # 💡 [추가] 계산된 지표 세션을 상태에 저장
                     st.session_state.opt_stats = opt_stats_acc
                     st.session_state.sho_stats = sho_stats_acc
                     st.session_state.opt_len = opt_len_acc
@@ -429,7 +425,6 @@ elif st.session_state.page == 'result':
     markers_json = json.dumps(st.session_state.marker_data)
     boundary_json = json.dumps(sd_boundary) if sd_boundary else "null"
     
-    # 💡 [추가] 13개 데이터 JS 전달용 JSON 포맷
     opt_stats_json = json.dumps(st.session_state.get('opt_stats', {c: 0.0 for c in criteria_cols}))
     sho_stats_json = json.dumps(st.session_state.get('sho_stats', {c: 0.0 for c in criteria_cols}))
     opt_len_val = st.session_state.get('opt_len', 0)
@@ -496,7 +491,6 @@ elif st.session_state.page == 'result':
             .primary-btn { background: linear-gradient(135deg, #00F5FF, #0080FF); color: #000; font-weight: 900; font-size: 16px; border: none; border-radius: 16px; padding: 16px; width: 100%; cursor: pointer;}
             .btn-back { position: absolute; top: 20px; left: 20px; z-index: 2000; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 10px 15px; border-radius: 12px; cursor: pointer; font-weight: bold;}
             
-            /* 💡 [추가] 세부 모달 애니메이션 및 디자인 */
             .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; backdrop-filter: blur(5px); }
             .modal-content { background: var(--bg-elevated); border: 1px solid var(--neon-cyan); border-radius: 20px; width: 100%; max-width: 400px; max-height: 85vh; padding: 20px; overflow-y: auto; color: #FFF; box-shadow: 0 10px 30px rgba(0,245,255,0.2);}
             .modal-content::-webkit-scrollbar { display: none; }
@@ -595,7 +589,6 @@ elif st.session_state.page == 'result':
         var dSho = ___DIST_SHO___;
         var dLoop = ___DIST_LOOP___;
         
-        // 💡 [추가] JS에서 사용할 상세 지표
         var optStats = ___OPT_STATS_JSON___;
         var shoStats = ___SHO_STATS_JSON___;
         var optLen = ___OPT_LEN_VAL___;
@@ -635,7 +628,6 @@ elif st.session_state.page == 'result':
                 L.polyline(optSegs, { color: '#00F5FF', weight: 6, opacity: 1.0 }).addTo(mainLayer);
             }
             
-            // 💡 [추가] 퍼센트 및 모달 데이터 초기 렌더링
             var impPct = 0;
             if (shoWell > 0 && shoWell > optWell) {
                 impPct = ((shoWell - optWell) / shoWell) * 100;
@@ -708,7 +700,6 @@ elif st.session_state.page == 'result':
             document.getElementById('val-time').innerText = st.mins;
             document.getElementById('val-kcal').innerText = st.kcal;
             
-            // 💡 [추가] 비교표 수치도 실시간 반영
             if(mode === "A_TO_B") {
                 let o = calc(dOpt), s = calc(dSho);
                 document.getElementById('cmp-d-o').innerText = o.km;
@@ -720,7 +711,6 @@ elif st.session_state.page == 'result':
             }
         }
         
-        // 💡 [추가] 모달 제어 자바스크립트
         function openDetailsModal() { document.getElementById('details-modal').style.display = 'flex'; }
         function closeDetailsModal() { document.getElementById('details-modal').style.display = 'none'; }
         
@@ -744,7 +734,6 @@ elif st.session_state.page == 'result':
     app_html = app_html.replace("___DIST_SHO___", str(st.session_state.dist_sho))
     app_html = app_html.replace("___DIST_LOOP___", str(st.session_state.dist_loop))
     
-    # 💡 [추가] JSON 데이터 주입
     app_html = app_html.replace("___OPT_STATS_JSON___", opt_stats_json)
     app_html = app_html.replace("___SHO_STATS_JSON___", sho_stats_json)
     app_html = app_html.replace("___OPT_LEN_VAL___", str(opt_len_val))
