@@ -667,8 +667,11 @@ elif st.session_state.page == 'result':
                     else diffStr = "<span style='color:#FF2D78; font-weight:bold;'>▼ " + Math.abs(diff).toFixed(2) + "</span>";
                 }
 
+                // 💡 [여기가 핵심!] 이름이 '편의점'이면 화면에는 '야간 조명'으로 표시!
+                var displayName = (c === '편의점') ? '야간 조명' : c;
+
                 var tr = "<div class='table-row'>" +
-                         "<div style='width: 30%; font-weight:bold;'>" + c + "</div>" +
+                         "<div style='width: 30%; font-weight:bold;'>" + displayName + "</div>" +
                          "<div style='width: 20%; text-align:center; color: var(--text-secondary);'>" + s_val.toFixed(2) + "</div>" +
                          "<div style='width: 25%; text-align:center; color: var(--neon-cyan); font-weight:bold;'>" + o_val.toFixed(2) + "</div>" +
                          "<div style='width: 25%; text-align:right;'>" + diffStr + "</div>" +
