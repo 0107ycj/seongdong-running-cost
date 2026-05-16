@@ -83,10 +83,50 @@ hub_names = list(hubs_info.keys())
 # --- 3. 데이터 로드 엔진 ---
 @st.cache_data
 def load_boundary():
+    # 💡 [핵심] 사용자가 올린 ZIP 파일을 Geopandas로 바로 읽어오는 로직으로 수정
+    if os.path.exists('soengdong_bndry.zip'):
+        try:
+            # zip:// 프로토콜을 사용하면 압축을 풀지 않고도 내부 데이터를 바로 읽어옵니다.
+            gdf_bndry = gpd.read_file('zip://soengdong_bndry.zip')
+            
+            # WGS84(EPSG:4326) 위경도로 변환
+            if gdf_bndry.crs != "EPSG:4326":
+                if gdf_bndry.crs is None:
+                    gdf_bndry = gdf_bndry.set_crs(epsg=5179)
+                gdf_bndry = gdf_bndry.to_crs(epsg=4326)
+            
+            return json.loads(gdf_bndry.to_json())
+        except Exception as e:
+            print("ZIP 파일 기반 경계 데이터 로드 실패:", e)
+
+    # (예비용) 혹시나 zip 파일 대신 json 파일이 그대로 올라가 있을 경우
+    elif os.path.exists('soengdong_bndry.json'):
+        try:
+            gdf_bndry = gpd.read_file('soengdong_bndry.json')
+            if gdf_bndry.crs != "EPSG:4326":
+                if gdf_bndry.crs is None:
+                    gdf_bndry = gdf_bndry.set_crs(epsg=5179)
+                gdf_bndry = gdf_bndry.to_crs(epsg=4326)
+            return json.loads(gdf_bndry.to_json())
+        except Exception as e:
+            print("JSON 파일 로드 실패:", e)
+            
+    # 파일이 아예 없거나 에러 났을 때를 대비한 깃허브 웹 다운로드 코드
     try:
         url = "https://raw.githubusercontent.com/southkorea/seoul-maps/master/kostat/2013/json/seoul_municipalities_geo_simple.json"
         seoul_geo = requests.get(url).json()
-        return {'type': 'FeatureCollection', 'features': [f for f in seoul_geo['features'] if f['properties']['name'] == '성동구']}
+        sd_feature = [f for f in seoul_geo['features'] if f['properties']['name'] == '성동구']
+        
+        if sd_feature:
+            LON_OFFSET = -0.003
+            LAT_OFFSET = 0.0007
+            def shift_coords(coords):
+                if isinstance(coords[0], (int, float)):
+                    return [coords[0] + LON_OFFSET, coords[1] + LAT_OFFSET]
+                return [shift_coords(c) for c in coords]
+            
+            sd_feature[0]['geometry']['coordinates'] = shift_coords(sd_feature[0]['geometry']['coordinates'])
+            return {'type': 'FeatureCollection', 'features': sd_feature}
     except: return None
 
 @st.cache_data
@@ -293,7 +333,6 @@ if st.session_state.page == 'step1_location':
     
     st.markdown("<div style='padding: 0 20px;'>", unsafe_allow_html=True)
     
-    # 💡 지도 시작 위치 수정 (127.04 -> 127.042)로 변경하여 치우침 해결
     m = folium.Map(location=[37.553, 127.042], zoom_start=13.5, tiles=None, zoom_control=False)
     folium.TileLayer('CartoDB dark_matter', attr=' ').add_to(m)
     
@@ -312,7 +351,7 @@ if st.session_state.page == 'step1_location':
     m.get_root().header.add_child(folium.Element(css_injection))
     
     if sd_boundary:
-        folium.GeoJson(sd_boundary, style_function=lambda x: {'color': 'white', 'fillColor': 'transparent', 'weight': 2, 'opacity': 0.6, 'dashArray':'5,5'}).add_to(m)
+        folium.GeoJson(sd_boundary, style_function=lambda x: {'color': '#00F5FF', 'fillColor': 'transparent', 'weight': 2.5, 'opacity': 0.6, 'dashArray':'5,5'}).add_to(m)
 
     for name, coords in hubs_info.items():
         marker = folium.CircleMarker(location=coords, radius=5, color='#00F5FF', fill=True, fillOpacity=0.8)
@@ -456,7 +495,7 @@ elif st.session_state.page == 'result':
     sho_json = json.dumps(st.session_state.main_sho_segments)
     loop_json = json.dumps(st.session_state.loop_segments)
     markers_json = json.dumps(st.session_state.marker_data)
-    fountains_json = json.dumps(fountains_data)
+    fountains_json = json.dumps(fountains_data) 
     boundary_json = json.dumps(sd_boundary) if sd_boundary else "null"
     
     opt_stats_json = json.dumps(st.session_state.get('opt_stats', {c: 0.0 for c in criteria_cols}))
@@ -496,8 +535,7 @@ elif st.session_state.page == 'result':
             }
             .label-tooltip::before, .label-tooltip::after { display: none !important; }
 
-            /* 💡 물방울 아이콘용 투명 CSS */
-            .custom-water-icon { background: none !important; border: none !important; }
+            .custom-water-icon { background: none !important; border: none !important; pointer-events: none !important;}
 
             .bottom-sheet { 
                 position: absolute; bottom: 0; left: 0; width: 100%; 
@@ -643,7 +681,7 @@ elif st.session_state.page == 'result':
 
         if(boundaryData) {
             L.geoJSON(boundaryData, {
-                style: {color: '#FFFFFF', weight: 2, fillOpacity: 0, opacity: 0.6, dashArray: '5,5'}
+                style: {color: '#00F5FF', weight: 2.5, fillOpacity: 0, opacity: 0.6, dashArray: '5,5'}
             }).addTo(map);
         }
 
@@ -651,7 +689,6 @@ elif st.session_state.page == 'result':
         var mainLayer = L.featureGroup().addTo(map);
         var waterLayer = L.featureGroup().addTo(map);
 
-        // 💡 텍스트/툴팁 없는 순수 물방울 아이콘 생성 로직
         var waterIcon = L.divIcon({
             html: '<div style="font-size: 16px; text-shadow: 0 0 5px rgba(0, 245, 255, 0.8);">💧</div>',
             className: 'custom-water-icon',
@@ -660,8 +697,7 @@ elif st.session_state.page == 'result':
         });
 
         fountainsData.forEach(f => {
-            // bindTooltip을 아예 제거하여 호버/드래그 시 아무 텍스트도 뜨지 않게 설정
-            L.marker([f.lat, f.lon], { icon: waterIcon }).addTo(waterLayer);
+            L.marker([f.lat, f.lon], { icon: waterIcon, interactive: false }).addTo(waterLayer);
         });
 
         markers.forEach(m => {
