@@ -81,12 +81,35 @@ hubs_info = {
 hub_names = list(hubs_info.keys())
 
 # --- 3. 데이터 로드 엔진 ---
+# 💡 [업데이트] 좌표 치우침 강제 이동 (Shift) 함수 추가!
 @st.cache_data
 def load_boundary():
+    # 1. 로컬에 GeoJSON 파일이 있으면 무조건 우선 사용 (이게 제일 정확함!)
+    if os.path.exists('성동구_범위.geojson'):
+        try:
+            with open('성동구_범위.geojson', 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print("로컬 범위 데이터 로드 실패:", e)
+            
+    # 2. 로컬 파일이 없으면 웹에서 가져오되, 위치를 강제로 보정함
     try:
         url = "https://raw.githubusercontent.com/southkorea/seoul-maps/master/kostat/2013/json/seoul_municipalities_geo_simple.json"
         seoul_geo = requests.get(url).json()
-        return {'type': 'FeatureCollection', 'features': [f for f in seoul_geo['features'] if f['properties']['name'] == '성동구']}
+        sd_feature = [f for f in seoul_geo['features'] if f['properties']['name'] == '성동구']
+        
+        if sd_feature:
+            # 💡 [핵심] 여기서 지도의 밀림 현상을 조절합니다!
+            LON_OFFSET = -0.003  # 마이너스(-)로 할수록 왼쪽으로 이동합니다 (현재 한 블럭 정도 왼쪽 셋팅)
+            LAT_OFFSET = 0.0007  # 플러스(+)로 할수록 위쪽으로 이동합니다
+            
+            def shift_coords(coords):
+                if isinstance(coords[0], (int, float)):
+                    return [coords[0] + LON_OFFSET, coords[1] + LAT_OFFSET]
+                return [shift_coords(c) for c in coords]
+            
+            sd_feature[0]['geometry']['coordinates'] = shift_coords(sd_feature[0]['geometry']['coordinates'])
+            return {'type': 'FeatureCollection', 'features': sd_feature}
     except: return None
 
 @st.cache_data
