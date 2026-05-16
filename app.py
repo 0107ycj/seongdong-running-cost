@@ -91,7 +91,7 @@ def load_boundary():
 
 # 💡 [핵심 수정] 음수대 데이터 로드 및 성동구 전용 필터링
 @st.cache_data
-def load_fountain_data():
+def load_fountain_data_v2():
     try:
         try:
             df = pd.read_csv('성동구_공원음수대.csv', encoding='utf-8')
@@ -185,7 +185,7 @@ def load_data():
 
 with st.spinner("엔진 부팅 중..."):
     sd_boundary = load_boundary()
-    fountains_data = load_fountain_data() # 💡 성동구 전용 음수대 데이터 로드 완료
+    fountains_data = load_fountain_data_v2() # 💡 성동구 전용 음수대 데이터 로드 완료
     G, node_coords, df_loop_merged, geom_dict = load_data()
 
 def get_nearest_node(lon, lat):
