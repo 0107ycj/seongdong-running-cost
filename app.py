@@ -82,13 +82,33 @@ hub_names = list(hubs_info.keys())
 
 # --- 3. 데이터 로드 엔진 ---
 @st.cache_data
+@st.cache_data
 def load_boundary():
     try:
         url = "https://raw.githubusercontent.com/southkorea/seoul-maps/master/kostat/2013/json/seoul_municipalities_geo_simple.json"
         seoul_geo = requests.get(url).json()
-        return {'type': 'FeatureCollection', 'features': [f for f in seoul_geo['features'] if f['properties']['name'] == '성동구']}
-    except: return None
-
+        sd_features = [f for f in seoul_geo['features'] if f['properties']['name'] == '성동구']
+        
+        # --- [좌표 강제 이동(Shift) 로직 추가] ---
+        # 갈색 경로에 맞게 점선을 전체적으로 왼쪽으로 이동시킵니다.
+        # 화면에 맞춰 lon_shift 값을 미세 조정해 보세요. (음수: 왼쪽, 양수: 오른쪽)
+        lon_shift = -0.0045 
+        lat_shift = 0.0     
+        
+        def shift_coords(coords):
+            # 가장 안쪽의 [경도, 위도] 좌표 쌍인 경우
+            if isinstance(coords[0], (int, float)):
+                return [coords[0] + lon_shift, coords[1] + lat_shift]
+            # 중첩된 폴리곤 리스트인 경우 재귀적으로 적용
+            return [shift_coords(c) for c in coords]
+        
+        for feature in sd_features:
+            feature['geometry']['coordinates'] = shift_coords(feature['geometry']['coordinates'])
+        # ----------------------------------------
+            
+        return {'type': 'FeatureCollection', 'features': sd_features}
+    except Exception as e: 
+        return None
 @st.cache_data
 def load_fountain_data():
     try:
