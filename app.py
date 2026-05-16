@@ -81,39 +81,16 @@ hubs_info = {
 hub_names = list(hubs_info.keys())
 
 # --- 3. 데이터 로드 엔진 ---
-# 💡 [핵심] 캐시(@st.cache_data)를 완전히 삭제했습니다. 매번 새롭게 ZIP 파일을 뜯어옵니다!
-def load_boundary():
-    if os.path.exists('soengdong_bndry.zip'):
-        try:
-            gdf_bndry = gpd.read_file('zip://soengdong_bndry.zip')
-            
-            # WGS84(EPSG:4326) 위경도로 변환
-            if gdf_bndry.crs != "EPSG:4326":
-                if gdf_bndry.crs is None:
-                    gdf_bndry = gdf_bndry.set_crs(epsg=5179)
-                gdf_bndry = gdf_bndry.to_crs(epsg=4326)
-            
-            return json.loads(gdf_bndry.to_json())
-        except Exception as e:
-            print("ZIP 파일 기반 경계 데이터 로드 실패:", e)
 
-    elif os.path.exists('soengdong_bndry.json'):
-        try:
-            gdf_bndry = gpd.read_file('soengdong_bndry.json')
-            if gdf_bndry.crs != "EPSG:4326":
-                if gdf_bndry.crs is None:
-                    gdf_bndry = gdf_bndry.set_crs(epsg=5179)
-                gdf_bndry = gdf_bndry.to_crs(epsg=4326)
-            return json.loads(gdf_bndry.to_json())
-        except Exception as e:
-            print("JSON 파일 로드 실패:", e)
-            
-    # 웹 다운로드 (최후의 수단)
+# 💡 1. 성동구 범위 (안정성을 위해 웹 경계 데이터 사용 + 미세조정)
+@st.cache_data
+def load_boundary():
     try:
         url = "https://raw.githubusercontent.com/southkorea/seoul-maps/master/kostat/2013/json/seoul_municipalities_geo_simple.json"
         seoul_geo = requests.get(url).json()
         sd_feature = [f for f in seoul_geo['features'] if f['properties']['name'] == '성동구']
         
+        # 지도 우측 치우침 해결
         if sd_feature:
             LON_OFFSET = -0.003
             LAT_OFFSET = 0.0007
@@ -126,7 +103,8 @@ def load_boundary():
             return {'type': 'FeatureCollection', 'features': sd_feature}
     except: return None
 
-# 💡 캐시 삭제
+# 💡 2. 음수대 위치 로드
+@st.cache_data
 def load_fountain_data():
     try:
         try:
@@ -150,10 +128,9 @@ def load_fountain_data():
                     'lon': float(row['X좌표(LNG)'])
                 })
         return fountains
-    except Exception as e:
+    except:
         return []
 
-# 이건 용량이 커서 로딩이 오래 걸리므로 캐시 유지
 @st.cache_resource
 def load_data():
     G = nx.Graph()
@@ -213,7 +190,7 @@ def load_data():
 
 with st.spinner("엔진 부팅 중..."):
     sd_boundary = load_boundary()
-    fountains_data = load_fountain_data() 
+    fountains_data = load_fountain_data()
     G, node_coords, df_loop_merged, geom_dict = load_data()
 
 def get_nearest_node(lon, lat):
