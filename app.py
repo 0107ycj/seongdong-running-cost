@@ -89,41 +89,31 @@ def load_boundary():
         return {'type': 'FeatureCollection', 'features': [f for f in seoul_geo['features'] if f['properties']['name'] == '성동구']}
     except: return None
 
-# 💡 [핵심 수정] 음수대 데이터 로드 및 성동구 전용 필터링
 @st.cache_data
-def load_fountain_data_v2():
+def load_fountain_data():
     try:
         try:
             df = pd.read_csv('성동구_공원음수대.csv', encoding='utf-8')
         except:
             df = pd.read_csv('성동구_공원음수대.csv', encoding='cp949')
             
-        # 1. 위경도를 강제로 숫자로 변환 (이게 없어서 아까 앱에서 터졌습니다!)
         df['Y좌표(LAT)'] = pd.to_numeric(df['Y좌표(LAT)'], errors='coerce')
         df['X좌표(LNG)'] = pd.to_numeric(df['X좌표(LNG)'], errors='coerce')
         df = df.dropna(subset=['X좌표(LNG)', 'Y좌표(LAT)'])
         
         fountains = []
         for _, row in df.iterrows():
-            # 2. 성동구 데이터만 필터링하기 위해 주소 추출
             addr1 = str(row.get('지번주소', ''))
             addr2 = str(row.get('도로명주소', ''))
             cid = str(row.get('컨텐츠 아이디', ''))
             
-            # 주소나 ID에 '성동구'라는 글자가 있을 때만 리스트에 추가
             if '성동구' in addr1 or '성동구' in addr2 or '성동구' in cid:
-                lat = row['Y좌표(LAT)']
-                lon = row['X좌표(LNG)']
-                name = str(row.get('공원 명', '공원'))
-                
                 fountains.append({
-                    'name': name,
-                    'lat': float(lat),
-                    'lon': float(lon)
+                    'lat': float(row['Y좌표(LAT)']),
+                    'lon': float(row['X좌표(LNG)'])
                 })
         return fountains
     except Exception as e:
-        print("음수대 에러:", e)
         return []
 
 @st.cache_resource
@@ -185,7 +175,7 @@ def load_data():
 
 with st.spinner("엔진 부팅 중..."):
     sd_boundary = load_boundary()
-    fountains_data = load_fountain_data_v2() # 💡 성동구 전용 음수대 데이터 로드 완료
+    fountains_data = load_fountain_data() 
     G, node_coords, df_loop_merged, geom_dict = load_data()
 
 def get_nearest_node(lon, lat):
@@ -303,7 +293,8 @@ if st.session_state.page == 'step1_location':
     
     st.markdown("<div style='padding: 0 20px;'>", unsafe_allow_html=True)
     
-    m = folium.Map(location=[37.55, 127.04], zoom_start=14, tiles=None, zoom_control=False)
+    # 💡 지도 시작 위치 수정 (127.04 -> 127.042)로 변경하여 치우침 해결
+    m = folium.Map(location=[37.553, 127.042], zoom_start=13.5, tiles=None, zoom_control=False)
     folium.TileLayer('CartoDB dark_matter', attr=' ').add_to(m)
     
     css_injection = """
@@ -465,7 +456,7 @@ elif st.session_state.page == 'result':
     sho_json = json.dumps(st.session_state.main_sho_segments)
     loop_json = json.dumps(st.session_state.loop_segments)
     markers_json = json.dumps(st.session_state.marker_data)
-    fountains_json = json.dumps(fountains_data) # 💡 업데이트된 성동구 전용 음수대 JSON
+    fountains_json = json.dumps(fountains_data)
     boundary_json = json.dumps(sd_boundary) if sd_boundary else "null"
     
     opt_stats_json = json.dumps(st.session_state.get('opt_stats', {c: 0.0 for c in criteria_cols}))
@@ -504,6 +495,9 @@ elif st.session_state.page == 'result':
                 white-space: nowrap !important; text-align: center !important; pointer-events: none;
             }
             .label-tooltip::before, .label-tooltip::after { display: none !important; }
+
+            /* 💡 물방울 아이콘용 투명 CSS */
+            .custom-water-icon { background: none !important; border: none !important; }
 
             .bottom-sheet { 
                 position: absolute; bottom: 0; left: 0; width: 100%; 
@@ -657,20 +651,17 @@ elif st.session_state.page == 'result':
         var mainLayer = L.featureGroup().addTo(map);
         var waterLayer = L.featureGroup().addTo(map);
 
-        // 💡 음수대 마커 (성동구 전용)
+        // 💡 텍스트/툴팁 없는 순수 물방울 아이콘 생성 로직
+        var waterIcon = L.divIcon({
+            html: '<div style="font-size: 16px; text-shadow: 0 0 5px rgba(0, 245, 255, 0.8);">💧</div>',
+            className: 'custom-water-icon',
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
+
         fountainsData.forEach(f => {
-            L.circleMarker([f.lat, f.lon], { 
-                color: '#00F5FF', 
-                radius: 5, 
-                fillOpacity: 0.9, 
-                weight: 2, 
-                fillColor: '#E0FFFF' 
-            })
-             .bindTooltip(
-                "💧 " + f.name, 
-                { direction: 'top', className: 'label-tooltip', offset: [0, -5] }
-             )
-             .addTo(waterLayer);
+            // bindTooltip을 아예 제거하여 호버/드래그 시 아무 텍스트도 뜨지 않게 설정
+            L.marker([f.lat, f.lon], { icon: waterIcon }).addTo(waterLayer);
         });
 
         markers.forEach(m => {
