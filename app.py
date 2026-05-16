@@ -93,7 +93,7 @@ def load_boundary():
         # 갈색 경로에 맞게 점선을 전체적으로 왼쪽으로 이동시킵니다.
         # 화면에 맞춰 lon_shift 값을 미세 조정해 보세요. (음수: 왼쪽, 양수: 오른쪽)
         lon_shift = -0.0037 
-        lat_shift = 0.0030     
+        lat_shift = 0.0028     
         
         def shift_coords(coords):
             # 가장 안쪽의 [경도, 위도] 좌표 쌍인 경우
