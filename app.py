@@ -81,12 +81,10 @@ hubs_info = {
 hub_names = list(hubs_info.keys())
 
 # --- 3. 데이터 로드 엔진 ---
-@st.cache_data
+# 💡 [핵심] 캐시(@st.cache_data)를 완전히 삭제했습니다. 매번 새롭게 ZIP 파일을 뜯어옵니다!
 def load_boundary():
-    # 💡 [핵심] 사용자가 올린 ZIP 파일을 Geopandas로 바로 읽어오는 로직으로 수정
     if os.path.exists('soengdong_bndry.zip'):
         try:
-            # zip:// 프로토콜을 사용하면 압축을 풀지 않고도 내부 데이터를 바로 읽어옵니다.
             gdf_bndry = gpd.read_file('zip://soengdong_bndry.zip')
             
             # WGS84(EPSG:4326) 위경도로 변환
@@ -99,7 +97,6 @@ def load_boundary():
         except Exception as e:
             print("ZIP 파일 기반 경계 데이터 로드 실패:", e)
 
-    # (예비용) 혹시나 zip 파일 대신 json 파일이 그대로 올라가 있을 경우
     elif os.path.exists('soengdong_bndry.json'):
         try:
             gdf_bndry = gpd.read_file('soengdong_bndry.json')
@@ -111,7 +108,7 @@ def load_boundary():
         except Exception as e:
             print("JSON 파일 로드 실패:", e)
             
-    # 파일이 아예 없거나 에러 났을 때를 대비한 깃허브 웹 다운로드 코드
+    # 웹 다운로드 (최후의 수단)
     try:
         url = "https://raw.githubusercontent.com/southkorea/seoul-maps/master/kostat/2013/json/seoul_municipalities_geo_simple.json"
         seoul_geo = requests.get(url).json()
@@ -129,7 +126,7 @@ def load_boundary():
             return {'type': 'FeatureCollection', 'features': sd_feature}
     except: return None
 
-@st.cache_data
+# 💡 캐시 삭제
 def load_fountain_data():
     try:
         try:
@@ -156,6 +153,7 @@ def load_fountain_data():
     except Exception as e:
         return []
 
+# 이건 용량이 커서 로딩이 오래 걸리므로 캐시 유지
 @st.cache_resource
 def load_data():
     G = nx.Graph()
