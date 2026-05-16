@@ -92,7 +92,7 @@ def load_boundary():
         # --- [좌표 강제 이동(Shift) 로직 추가] ---
         # 갈색 경로에 맞게 점선을 전체적으로 왼쪽으로 이동시킵니다.
         # 화면에 맞춰 lon_shift 값을 미세 조정해 보세요. (음수: 왼쪽, 양수: 오른쪽)
-        lon_shift = -0.0030 
+        lon_shift = -0.0037 
         lat_shift = 0.0     
         
         def shift_coords(coords):
