@@ -89,7 +89,7 @@ def load_boundary():
         return {'type': 'FeatureCollection', 'features': [f for f in seoul_geo['features'] if f['properties']['name'] == '성동구']}
     except: return None
 
-# 💡 [추가] 음수대 데이터 로드 함수
+# 💡 [핵심 수정] 음수대 데이터 로드 및 성동구 전용 필터링
 @st.cache_data
 def load_fountain_data():
     try:
@@ -98,19 +98,32 @@ def load_fountain_data():
         except:
             df = pd.read_csv('성동구_공원음수대.csv', encoding='cp949')
             
+        # 1. 위경도를 강제로 숫자로 변환 (이게 없어서 아까 앱에서 터졌습니다!)
+        df['Y좌표(LAT)'] = pd.to_numeric(df['Y좌표(LAT)'], errors='coerce')
+        df['X좌표(LNG)'] = pd.to_numeric(df['X좌표(LNG)'], errors='coerce')
+        df = df.dropna(subset=['X좌표(LNG)', 'Y좌표(LAT)'])
+        
         fountains = []
         for _, row in df.iterrows():
-            lat = row.get('Y좌표(LAT)')
-            lon = row.get('X좌표(LNG)')
-            name = row.get('공원 명', '공원')
-            if pd.notna(lat) and pd.notna(lon):
+            # 2. 성동구 데이터만 필터링하기 위해 주소 추출
+            addr1 = str(row.get('지번주소', ''))
+            addr2 = str(row.get('도로명주소', ''))
+            cid = str(row.get('컨텐츠 아이디', ''))
+            
+            # 주소나 ID에 '성동구'라는 글자가 있을 때만 리스트에 추가
+            if '성동구' in addr1 or '성동구' in addr2 or '성동구' in cid:
+                lat = row['Y좌표(LAT)']
+                lon = row['X좌표(LNG)']
+                name = str(row.get('공원 명', '공원'))
+                
                 fountains.append({
-                    'name': str(name),
+                    'name': name,
                     'lat': float(lat),
                     'lon': float(lon)
                 })
         return fountains
-    except:
+    except Exception as e:
+        print("음수대 에러:", e)
         return []
 
 @st.cache_resource
@@ -172,7 +185,7 @@ def load_data():
 
 with st.spinner("엔진 부팅 중..."):
     sd_boundary = load_boundary()
-    fountains_data = load_fountain_data() # 💡 음수대 데이터 로드
+    fountains_data = load_fountain_data() # 💡 성동구 전용 음수대 데이터 로드 완료
     G, node_coords, df_loop_merged, geom_dict = load_data()
 
 def get_nearest_node(lon, lat):
@@ -452,7 +465,7 @@ elif st.session_state.page == 'result':
     sho_json = json.dumps(st.session_state.main_sho_segments)
     loop_json = json.dumps(st.session_state.loop_segments)
     markers_json = json.dumps(st.session_state.marker_data)
-    fountains_json = json.dumps(fountains_data) # 💡 음수대 JSON
+    fountains_json = json.dumps(fountains_data) # 💡 업데이트된 성동구 전용 음수대 JSON
     boundary_json = json.dumps(sd_boundary) if sd_boundary else "null"
     
     opt_stats_json = json.dumps(st.session_state.get('opt_stats', {c: 0.0 for c in criteria_cols}))
@@ -501,7 +514,6 @@ elif st.session_state.page == 'result':
             }
             .bottom-sheet::-webkit-scrollbar { display: none; }
             
-            /* 💡 토글 패널 버튼 스타일 일부 수정 (3개 버튼 배치) */
             .toggle-panel { display: flex; gap: 8px; margin-bottom: 15px; }
             .toggle-btn { flex: 1; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: #FFF; padding: 10px 5px; border-radius: 12px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;}
             .toggle-btn.active { background: rgba(0,245,255,0.15); border-color: var(--neon-cyan); color: var(--neon-cyan); }
@@ -615,7 +627,7 @@ elif st.session_state.page == 'result':
         var shoSegs = ___SHO_JSON___;
         var loopSegs = ___LOOP_JSON___;
         var markers = ___MARKERS_JSON___;
-        var fountainsData = ___FOUNTAINS_JSON___; // 💡 음수대 데이터 불러오기
+        var fountainsData = ___FOUNTAINS_JSON___; 
         var boundaryData = ___BOUNDARY_JSON___;
         var mode = "___MODE___";
         
@@ -643,12 +655,12 @@ elif st.session_state.page == 'result':
 
         var appLayer = L.featureGroup().addTo(map);
         var mainLayer = L.featureGroup().addTo(map);
-        var waterLayer = L.featureGroup().addTo(map); // 💡 음수대 레이어 생성
+        var waterLayer = L.featureGroup().addTo(map);
 
-        // 💡 음수대 마커 찍기
+        // 💡 음수대 마커 (성동구 전용)
         fountainsData.forEach(f => {
             L.circleMarker([f.lat, f.lon], { 
-                color: '#00BFFF', 
+                color: '#00F5FF', 
                 radius: 5, 
                 fillOpacity: 0.9, 
                 weight: 2, 
@@ -733,7 +745,7 @@ elif st.session_state.page == 'result':
                 mainVis = !mainVis;
                 mainVis ? map.addLayer(mainLayer) : map.removeLayer(mainLayer);
                 document.getElementById('btn-main').classList.toggle('active', mainVis);
-            } else if (type === 'water') { // 💡 음수대 레이어 토글 로직
+            } else if (type === 'water') {
                 waterVis = !waterVis;
                 waterVis ? map.addLayer(waterLayer) : map.removeLayer(waterLayer);
                 document.getElementById('btn-water').classList.toggle('active', waterVis);
@@ -783,7 +795,7 @@ elif st.session_state.page == 'result':
     app_html = app_html.replace("___SHO_JSON___", sho_json)
     app_html = app_html.replace("___LOOP_JSON___", loop_json)
     app_html = app_html.replace("___MARKERS_JSON___", markers_json)
-    app_html = app_html.replace("___FOUNTAINS_JSON___", fountains_json) # 💡 추가됨
+    app_html = app_html.replace("___FOUNTAINS_JSON___", fountains_json)
     app_html = app_html.replace("___BOUNDARY_JSON___", boundary_json)
     app_html = app_html.replace("___MODE___", mode)
     app_html = app_html.replace("___U_LAT___", str(u_lat))
