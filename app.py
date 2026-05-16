@@ -63,7 +63,6 @@ if 'dist_opt' not in st.session_state: st.session_state.dist_opt = 0
 if 'dist_sho' not in st.session_state: st.session_state.dist_sho = 0
 if 'dist_loop' not in st.session_state: st.session_state.dist_loop = 0
 
-# 💡 [UI용 세션 저장소] 세부 데이터 보기를 위한 통계
 if 'opt_stats' not in st.session_state: st.session_state.opt_stats = {c: 0.0 for c in criteria_cols}
 if 'sho_stats' not in st.session_state: st.session_state.sho_stats = {c: 0.0 for c in criteria_cols}
 if 'opt_len' not in st.session_state: st.session_state.opt_len = 0
@@ -81,7 +80,7 @@ hubs_info = {
 }
 hub_names = list(hubs_info.keys())
 
-# --- 3. 데이터 로드 엔진 (유저님 코드 100% 동일) ---
+# --- 3. 데이터 로드 엔진 ---
 @st.cache_data
 def load_boundary():
     try:
@@ -89,6 +88,30 @@ def load_boundary():
         seoul_geo = requests.get(url).json()
         return {'type': 'FeatureCollection', 'features': [f for f in seoul_geo['features'] if f['properties']['name'] == '성동구']}
     except: return None
+
+# 💡 [추가] 음수대 데이터 로드 함수
+@st.cache_data
+def load_fountain_data():
+    try:
+        try:
+            df = pd.read_csv('성동구_공원음수대.csv', encoding='utf-8')
+        except:
+            df = pd.read_csv('성동구_공원음수대.csv', encoding='cp949')
+            
+        fountains = []
+        for _, row in df.iterrows():
+            lat = row.get('Y좌표(LAT)')
+            lon = row.get('X좌표(LNG)')
+            name = row.get('공원 명', '공원')
+            if pd.notna(lat) and pd.notna(lon):
+                fountains.append({
+                    'name': str(name),
+                    'lat': float(lat),
+                    'lon': float(lon)
+                })
+        return fountains
+    except:
+        return []
 
 @st.cache_resource
 def load_data():
@@ -149,6 +172,7 @@ def load_data():
 
 with st.spinner("엔진 부팅 중..."):
     sd_boundary = load_boundary()
+    fountains_data = load_fountain_data() # 💡 음수대 데이터 로드
     G, node_coords, df_loop_merged, geom_dict = load_data()
 
 def get_nearest_node(lon, lat):
@@ -181,7 +205,6 @@ def calc_real_physical_distance(segments):
             total_dist += R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     return total_dist
 
-# 💡 [모달 기능용] 세부 지표와 "wellness" 점수를 함께 반환하도록 수정 (기존 로직 완벽유지)
 def get_stats_for_segment(path):
     length = 0
     well = 0.0
@@ -199,7 +222,6 @@ def get_stats_for_segment(path):
             stats[c] += val * l
     return length, stats, well
 
-# 💡 [핵심] 유저님이 원하시던 최단=최적 허용 로직! (1.0 ~ 1.5)
 def get_pareto_optimal_path(G, source, target, min_ratio=1.0, max_ratio=1.5):
     try:
         shortest_path = nx.shortest_path(G, source=source, target=target, weight='length')
@@ -334,7 +356,6 @@ elif st.session_state.page == 'step2_course':
                     
                     opt_segs, sho_segs = [], []
                     
-                    # 💡 모달창 데이터를 위한 변수들
                     opt_len_acc, sho_len_acc = 0, 0
                     opt_well_acc, sho_well_acc = 0, 0
                     opt_stats_acc = {c: 0.0 for c in criteria_cols}
@@ -345,7 +366,6 @@ elif st.session_state.page == 'step2_course':
                         e_node = get_nearest_node(hubs_info[seq[i+1]][1], hubs_info[seq[i+1]][0])
                         
                         try: 
-                            # 유저님이 원하신 1.0 ~ 1.5배 로직 적용!
                             p_o = get_pareto_optimal_path(G, s_node, e_node, min_ratio=1.0, max_ratio=1.5)
                             opt_segs.extend(extract_real_geometry(p_o))
                             l, s, w = get_stats_for_segment(p_o)
@@ -432,9 +452,9 @@ elif st.session_state.page == 'result':
     sho_json = json.dumps(st.session_state.main_sho_segments)
     loop_json = json.dumps(st.session_state.loop_segments)
     markers_json = json.dumps(st.session_state.marker_data)
+    fountains_json = json.dumps(fountains_data) # 💡 음수대 JSON
     boundary_json = json.dumps(sd_boundary) if sd_boundary else "null"
     
-    # 💡 모달 데이터 JSON 변환
     opt_stats_json = json.dumps(st.session_state.get('opt_stats', {c: 0.0 for c in criteria_cols}))
     sho_stats_json = json.dumps(st.session_state.get('sho_stats', {c: 0.0 for c in criteria_cols}))
     opt_len_val = st.session_state.get('opt_len', 0)
@@ -481,8 +501,9 @@ elif st.session_state.page == 'result':
             }
             .bottom-sheet::-webkit-scrollbar { display: none; }
             
-            .toggle-panel { display: flex; gap: 10px; margin-bottom: 15px; }
-            .toggle-btn { flex: 1; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: #FFF; padding: 10px; border-radius: 12px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;}
+            /* 💡 토글 패널 버튼 스타일 일부 수정 (3개 버튼 배치) */
+            .toggle-panel { display: flex; gap: 8px; margin-bottom: 15px; }
+            .toggle-btn { flex: 1; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: #FFF; padding: 10px 5px; border-radius: 12px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;}
             .toggle-btn.active { background: rgba(0,245,255,0.15); border-color: var(--neon-cyan); color: var(--neon-cyan); }
             
             .stats-grid { display: flex; justify-content: space-between; text-align: center; margin-bottom: 15px; }
@@ -490,7 +511,6 @@ elif st.session_state.page == 'result':
             .stat-val { font-size: 18px; font-weight: 900; color: #FFF; margin-top: 5px; }
             .stat-label { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
 
-            /* 💡 [요청하신 UI 1] 두번째 사진처럼 비교표가 기본적으로 노출되도록 강제 설정 */
             .compare-modal { display: block; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 15px; }
             
             .comp-row { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 8px 0; font-size: 13px; }
@@ -503,7 +523,6 @@ elif st.session_state.page == 'result':
             .primary-btn { background: linear-gradient(135deg, #00F5FF, #0080FF); color: #000; font-weight: 900; font-size: 16px; border: none; border-radius: 16px; padding: 16px; width: 100%; cursor: pointer;}
             .btn-back { position: absolute; top: 20px; left: 20px; z-index: 2000; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 10px 15px; border-radius: 12px; cursor: pointer; font-weight: bold;}
             
-            /* 💡 [요청하신 UI 3] 상세 데이터 보기 모달창 디자인 */
             .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; backdrop-filter: blur(5px); }
             .modal-content { background: var(--bg-elevated); border: 1px solid var(--neon-cyan); border-radius: 20px; width: 100%; max-width: 400px; max-height: 85vh; padding: 20px; overflow-y: auto; color: #FFF; box-shadow: 0 10px 30px rgba(0,245,255,0.2);}
             .modal-content::-webkit-scrollbar { display: none; }
@@ -516,8 +535,9 @@ elif st.session_state.page == 'result':
     
     <div class="bottom-sheet">
         <div class="toggle-panel">
-            <button id="btn-app" class="toggle-btn active" onclick="toggleLayer('app')">🚶‍♂️ 접근경로</button>
-            <button id="btn-main" class="toggle-btn active" onclick="toggleLayer('main')">🏃 러닝코스</button>
+            <button id="btn-app" class="toggle-btn active" onclick="toggleLayer('app')">🚶‍♂️ 접근</button>
+            <button id="btn-main" class="toggle-btn active" onclick="toggleLayer('main')">🏃 코스</button>
+            <button id="btn-water" class="toggle-btn active" onclick="toggleLayer('water')">💧 음수대</button>
         </div>
 
         <div class="stats-grid">
@@ -595,6 +615,7 @@ elif st.session_state.page == 'result':
         var shoSegs = ___SHO_JSON___;
         var loopSegs = ___LOOP_JSON___;
         var markers = ___MARKERS_JSON___;
+        var fountainsData = ___FOUNTAINS_JSON___; // 💡 음수대 데이터 불러오기
         var boundaryData = ___BOUNDARY_JSON___;
         var mode = "___MODE___";
         
@@ -622,6 +643,23 @@ elif st.session_state.page == 'result':
 
         var appLayer = L.featureGroup().addTo(map);
         var mainLayer = L.featureGroup().addTo(map);
+        var waterLayer = L.featureGroup().addTo(map); // 💡 음수대 레이어 생성
+
+        // 💡 음수대 마커 찍기
+        fountainsData.forEach(f => {
+            L.circleMarker([f.lat, f.lon], { 
+                color: '#00BFFF', 
+                radius: 5, 
+                fillOpacity: 0.9, 
+                weight: 2, 
+                fillColor: '#E0FFFF' 
+            })
+             .bindTooltip(
+                "💧 " + f.name, 
+                { direction: 'top', className: 'label-tooltip', offset: [0, -5] }
+             )
+             .addTo(waterLayer);
+        });
 
         markers.forEach(m => {
             L.circleMarker([m.lat, m.lon], { color: m.color, radius: 7, fillOpacity: 1, weight: 2, fillColor: '#111' })
@@ -642,7 +680,6 @@ elif st.session_state.page == 'result':
                 L.polyline(optSegs, { color: '#00F5FF', weight: 6, opacity: 1.0 }).addTo(mainLayer);
             }
             
-            // 💡 퍼센트 향상 문구 계산 로직
             var impPct = 0;
             if (shoWell > 0 && shoWell > optWell) {
                 impPct = ((shoWell - optWell) / shoWell) * 100;
@@ -654,7 +691,6 @@ elif st.session_state.page == 'result':
                 impDiv.innerHTML = "✨ 최단 거리이면서 동시에 쾌적한 최적의 웰니스 코스입니다!";
             }
             
-            // 💡 13개 지표 데이터를 모달창에 동적으로 생성해주는 로직
             var tbody = document.getElementById("details-table-body");
             criteria.forEach(function(c) {
                 var o_val = optLen > 0 ? (optStats[c] / optLen) : 0;
@@ -667,7 +703,6 @@ elif st.session_state.page == 'result':
                     else diffStr = "<span style='color:#FF2D78; font-weight:bold;'>▼ " + Math.abs(diff).toFixed(2) + "</span>";
                 }
 
-                // 💡 [여기가 핵심!] 이름이 '편의점'이면 화면에는 '야간 조명'으로 표시!
                 var displayName = (c === '편의점') ? '야간 조명' : c;
 
                 var tr = "<div class='table-row'>" +
@@ -688,16 +723,20 @@ elif st.session_state.page == 'result':
         
         setTimeout(() => map.fitBounds(mainLayer.getBounds(), { paddingBottomRight: [0, 300], paddingTopLeft: [20, 50] }), 500);
 
-        var appVis = true, mainVis = true;
+        var appVis = true, mainVis = true, waterVis = true;
         function toggleLayer(type) {
             if(type === 'app') {
                 appVis = !appVis;
                 appVis ? map.addLayer(appLayer) : map.removeLayer(appLayer);
                 document.getElementById('btn-app').classList.toggle('active', appVis);
-            } else {
+            } else if (type === 'main') {
                 mainVis = !mainVis;
                 mainVis ? map.addLayer(mainLayer) : map.removeLayer(mainLayer);
                 document.getElementById('btn-main').classList.toggle('active', mainVis);
+            } else if (type === 'water') { // 💡 음수대 레이어 토글 로직
+                waterVis = !waterVis;
+                waterVis ? map.addLayer(waterLayer) : map.removeLayer(waterLayer);
+                document.getElementById('btn-water').classList.toggle('active', waterVis);
             }
             updateStats(); 
         }
@@ -719,7 +758,6 @@ elif st.session_state.page == 'result':
             document.getElementById('val-time').innerText = st.mins;
             document.getElementById('val-kcal').innerText = st.kcal;
             
-            // 💡 결과창 비교표 기본 노출 데이터 갱신
             if(mode === "A_TO_B") {
                 let o = calc(dOpt), s = calc(dSho);
                 document.getElementById('cmp-d-o').innerText = o.km;
@@ -745,6 +783,7 @@ elif st.session_state.page == 'result':
     app_html = app_html.replace("___SHO_JSON___", sho_json)
     app_html = app_html.replace("___LOOP_JSON___", loop_json)
     app_html = app_html.replace("___MARKERS_JSON___", markers_json)
+    app_html = app_html.replace("___FOUNTAINS_JSON___", fountains_json) # 💡 추가됨
     app_html = app_html.replace("___BOUNDARY_JSON___", boundary_json)
     app_html = app_html.replace("___MODE___", mode)
     app_html = app_html.replace("___U_LAT___", str(u_lat))
