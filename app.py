@@ -6,6 +6,7 @@ import math
 import json
 import folium
 import requests
+import base64
 from pyproj import Transformer
 from streamlit_folium import st_folium
 import streamlit.components.v1 as components
@@ -13,6 +14,14 @@ import os
 
 # --- 1. 앱 설정 및 커스텀 CSS ---
 st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
+
+# 💡 이미지를 안전하게 불러오는 함수 (파일이 없어도 에러가 나지 않고 임시 이미지를 띄움)
+def get_base64_image(image_path):
+    try:
+        with open(image_path, "rb") as img_file:
+            return "data:image/jpeg;base64," + base64.b64encode(img_file.read()).decode()
+    except:
+        return "https://via.placeholder.com/300x200/1E1E2E/FFFFFF?text=Image+Not+Found"
 
 st.markdown("""
     <style>
@@ -42,20 +51,20 @@ st.markdown("""
         div[role="radiogroup"] label p { color: #FFFFFF !important; font-weight: 700 !important; font-size: 15px !important; }
         .stSelectbox > label { color: #8A8AA0; font-size: 12px; margin-bottom: -5px;}
         
-        /* 💡 스마트폰 하단 스와이프 갤러리 특화 CSS */
+        /* 💡 갤러리 디자인 CSS */
         .gallery-container {
             display: flex; overflow-x: auto; gap: 15px; padding: 10px 20px 20px 20px;
             scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
         }
-        .gallery-container::-webkit-scrollbar { display: none; } /* 스크롤바 숨김 */
+        .gallery-container::-webkit-scrollbar { display: none; }
         .gallery-card {
             min-width: 240px; flex: 0 0 auto; background: #1E1E2E; border: 1px solid rgba(255,255,255,0.1);
             border-radius: 16px; padding: 15px; scroll-snap-align: start; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
-        .gallery-img { width: 100%; height: 120px; object-fit: cover; border-radius: 10px; margin-bottom: 12px; }
+        .gallery-img { width: 100%; height: 130px; object-fit: cover; border-radius: 10px; margin-bottom: 12px; }
         .gallery-title { color: #FFF; font-size: 18px; font-weight: 900; margin-bottom: 5px; display: flex; align-items: center; gap: 6px;}
-        .gallery-type { font-size: 11px; font-weight: 800; margin-bottom: 12px; display: inline-block; padding: 3px 8px; border-radius: 6px;}
-        .gallery-fac { font-size: 11px; color: #CCC; line-height: 1.5; }
+        .gallery-type { font-size: 11px; font-weight: 800; margin-bottom: 12px; display: inline-block; padding: 4px 8px; border-radius: 6px;}
+        .gallery-fac { font-size: 11px; color: #FFF; line-height: 1.6; }
         .fac-badge { background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 6px; display: inline-block; margin: 2px 2px 2px 0;}
     </style>
 """, unsafe_allow_html=True)
@@ -86,20 +95,27 @@ if 'sho_len' not in st.session_state: st.session_state.sho_len = 0
 if 'opt_well' not in st.session_state: st.session_state.opt_well = 0
 if 'sho_well' not in st.session_state: st.session_state.sho_well = 0
 
-# 💡 거점 세부 정보 및 테마 컬러 적용
+# 💡 완벽하게 정리된 거점 데이터 (확장자 .jpg 기본 세팅)
 hubs_info = {
-    "옥수역": {"coords": (37.5413498, 127.0171347), "type": "액티비티형", "icon": "🏋️", "color": "#39FF14", "bg": "rgba(57,255,20,0.15)", "facilities": ["야외 짐(Gym)", "스트레칭존", "스마트 락커"], "image": "https://images.unsplash.com/photo-1571008840902-17b254b08f43?q=80&w=300&h=200&fit=crop"},
-    "왕십리역": {"coords": (37.5616302, 127.0351177), "type": "커뮤니티형", "icon": "🤝", "color": "#FF2D78", "bg": "rgba(255,45,120,0.15)", "facilities": ["야간 조명 광장", "공연장", "커뮤니티 보드"], "image": "https://images.unsplash.com/photo-1517502884422-41eaead166d4?q=80&w=300&h=200&fit=crop"},
-    "금호나들목": {"coords": (37.5512902, 127.0356081), "type": "휴식/힐링형", "icon": "🧘", "color": "#00F5FF", "bg": "rgba(0,245,255,0.15)", "facilities": ["스마트 급수대", "쿨링 포그", "휴식 벤치"], "image": "https://images.unsplash.com/photo-1519331582075-8199732bd50a?q=80&w=300&h=200&fit=crop"},
-    "성덕정나들목": {"coords": (37.5375776, 127.0454704), "type": "자연친화형", "icon": "🌳", "color": "#FFD700", "bg": "rgba(255,215,0,0.15)", "facilities": ["실내 정원", "맨발 걷기 길"], "image": "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=300&h=200&fit=crop"},
-    "청구아파트나들목": {"coords": (37.5348428, 127.0552105), "type": "액티비티형", "icon": "🏋️", "color": "#39FF14", "bg": "rgba(57,255,20,0.15)", "facilities": ["스트레칭존", "스마트 락커"], "image": "https://images.unsplash.com/photo-1571008840902-17b254b08f43?q=80&w=300&h=200&fit=crop"},
-    "송정체육공원": {"coords": (37.5536442, 127.0672346), "type": "액티비티형", "icon": "🏋️", "color": "#39FF14", "bg": "rgba(57,255,20,0.15)", "facilities": ["육상 트랙", "야외 짐(Gym)"], "image": "https://images.unsplash.com/photo-1571008840902-17b254b08f43?q=80&w=300&h=200&fit=crop"},
-    "서울숲역": {"coords": (37.5465240, 127.0429873), "type": "자연친화형", "icon": "🌳", "color": "#FFD700", "bg": "rgba(255,215,0,0.15)", "facilities": ["수목 터널", "휴식 벤치"], "image": "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=300&h=200&fit=crop"},
-    "성삼공원": {"coords": (37.5420202, 127.0602789), "type": "커뮤니티형", "icon": "🤝", "color": "#FF2D78", "bg": "rgba(255,45,120,0.15)", "facilities": ["야간 조명", "커뮤니티 보드"], "image": "https://images.unsplash.com/photo-1517502884422-41eaead166d4?q=80&w=300&h=200&fit=crop"},
-    "금옥공원": {"coords": (37.5534649, 127.0213021), "type": "휴식/힐링형", "icon": "🧘", "color": "#00F5FF", "bg": "rgba(0,245,255,0.15)", "facilities": ["스마트 급수대", "명상존"], "image": "https://images.unsplash.com/photo-1519331582075-8199732bd50a?q=80&w=300&h=200&fit=crop"},
-    "꽃재공원": {"coords": (37.5672965, 127.0282145), "type": "자연친화형", "icon": "🌳", "color": "#FFD700", "bg": "rgba(255,215,0,0.15)", "facilities": ["피톤치드 숲", "휴식 벤치"], "image": "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=300&h=200&fit=crop"},
-    "용답마을마당": {"coords": (37.5619688, 127.0517828), "type": "커뮤니티형", "icon": "🤝", "color": "#FF2D78", "bg": "rgba(255,45,120,0.15)", "facilities": ["마을 광장", "야간 조명"], "image": "https://images.unsplash.com/photo-1517502884422-41eaead166d4?q=80&w=300&h=200&fit=crop"},
-    "향림소공원": {"coords": (37.5467465, 127.0534440), "type": "휴식/힐링형", "icon": "🧘", "color": "#00F5FF", "bg": "rgba(0,245,255,0.15)", "facilities": ["쿨링 포그", "급수대"], "image": "https://images.unsplash.com/photo-1519331582075-8199732bd50a?q=80&w=300&h=200&fit=crop"}
+    # 1. 교통 요충지형 (네온 그린)
+    "옥수역": {"coords": (37.5413498, 127.0171347), "type": "교통 요충지형", "icon": "🚇", "color": "#39FF14", "bg": "rgba(57,255,20,0.15)", "image": "oksu.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함", "휴식 라운지"]},
+    "왕십리역": {"coords": (37.5616302, 127.0351177), "type": "교통 요충지형", "icon": "🚉", "color": "#39FF14", "bg": "rgba(57,255,20,0.15)", "image": "wang.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함"]},
+    
+    # 2. 수변 관문형 (네온 블루)
+    "금호나들목": {"coords": (37.5512902, 127.0356081), "type": "수변 관문형", "icon": "🌊", "color": "#00F5FF", "bg": "rgba(0,245,255,0.15)", "image": "ho.jpg", "facilities": ["야외 운동기구", "음수대", "물품보관함"]},
+    "성덕정나들목": {"coords": (37.5375776, 127.0454704), "type": "수변 관문형", "icon": "🌉", "color": "#00F5FF", "bg": "rgba(0,245,255,0.15)", "image": "duck.jpg", "facilities": ["야외 운동기구", "음수대", "물품보관함", "야간 조명"]},
+    "청구아파트나들목": {"coords": (37.5348428, 127.0552105), "type": "수변 관문형", "icon": "🌊", "color": "#00F5FF", "bg": "rgba(0,245,255,0.15)", "image": "gu.jpg", "facilities": ["음수대", "물품보관함", "야간 조명", "쿨링 미스트"]},
+    "송정체육공원": {"coords": (37.5536442, 127.0672346), "type": "수변 관문형", "icon": "🌉", "color": "#00F5FF", "bg": "rgba(0,245,255,0.15)", "image": "song.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함"]},
+
+    # 3. 상권 / 트렌드형 (네온 핑크)
+    "서울숲역": {"coords": (37.5465240, 127.0429873), "type": "상권/트렌드형", "icon": "🛍️", "color": "#FF2D78", "bg": "rgba(255,45,120,0.15)", "image": "forest.jpg", "facilities": ["스트리트 파클릿", "음수대", "물품보관함"]},
+    "성삼공원": {"coords": (37.5420202, 127.0602789), "type": "상권/트렌드형", "icon": "☕", "color": "#FF2D78", "bg": "rgba(255,45,120,0.15)", "image": "sam.jpg", "facilities": ["휴식 파클릿", "음수대", "물품보관함"]},
+
+    # 4. 주거 밀착형 (골드 옐로우)
+    "금옥공원": {"coords": (37.5534649, 127.0213021), "type": "주거 밀착형", "icon": "🏘️", "color": "#FFD700", "bg": "rgba(255,215,0,0.15)", "image": "gold.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함", "휴식 라운지"]},
+    "꽃재공원": {"coords": (37.5672965, 127.0282145), "type": "주거 밀착형", "icon": "🏡", "color": "#FFD700", "bg": "rgba(255,215,0,0.15)", "image": "flower.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함"]},
+    "용답마을마당": {"coords": (37.5619688, 127.0517828), "type": "주거 밀착형", "icon": "🏘️", "color": "#FFD700", "bg": "rgba(255,215,0,0.15)", "image": "yong.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함", "휴식 라운지"]},
+    "향림소공원": {"coords": (37.5467465, 127.0534440), "type": "주거 밀착형", "icon": "🏡", "color": "#FFD700", "bg": "rgba(255,215,0,0.15)", "image": "lim.jpg", "facilities": ["운동시설", "음수대", "물품보관함"]}
 }
 hub_names = list(hubs_info.keys())
 
@@ -214,7 +230,7 @@ def get_nearest_node(lon, lat):
     return min(node_coords.keys(), key=lambda n: math.sqrt((node_coords[n][0]-lon)**2 + (node_coords[n][1]-lat)**2))
 
 def get_nearest_hub(lat, lon):
-    return min(hubs_info.keys(), key=lambda h: math.sqrt((hubs_info[h][0]-lat)**2 + (hubs_info[h][1]-lon)**2))
+    return min(hubs_info.keys(), key=lambda h: math.sqrt((hubs_info[h]['coords'][0]-lat)**2 + (hubs_info[h]['coords'][1]-lon)**2))
 
 def extract_real_geometry(path):
     segments = []
@@ -314,7 +330,7 @@ if st.session_state.page == 'step1_location':
         <div style="margin: 5px 20px 20px 20px; background: linear-gradient(135deg, rgba(0,245,255,0.15) 0%, rgba(0,0,0,0) 100%); border: 1px solid rgba(0,245,255,0.2); border-radius: 20px; padding: 22px; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
             <div style="position: absolute; right: -15px; bottom: -20px; font-size: 110px; opacity: 0.1; transform: rotate(-15deg);">👟</div>
             <h2 style="margin: 0 0 8px 0; color: #FFF; font-size: 26px; font-weight: 900; letter-spacing: -1px;">Ready to Run?</h2>
-            <p style="margin: 0 0 16px 0; color: #8A8AA0; font-size: 13px; line-height: 1.4;">지도에서 <b>출발할 현재 위치</b>를 탭하여<br>최적의 웰니스 러닝 코스를 탐색하세요.</p>
+            <p style="margin: 0 0 16px 0; color: #8A8AA0; font-size: 13px; line-height: 1.4;">지도에서 <b>출발할 위치</b>를 탭하여<br>최적의 웰니스 러닝 코스를 탐색하세요.</p>
         </div>
     """, unsafe_allow_html=True)
     
@@ -326,7 +342,6 @@ if st.session_state.page == 'step1_location':
     css_injection = """
     <style>
         .leaflet-control-attribution { display: none !important; visibility: hidden !important; }
-        /* 팝업 투명하게 만들기 */
         .leaflet-popup-content-wrapper { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
         .leaflet-popup-tip { display: none !important; }
         .leaflet-popup-content { margin: 0 !important; width: auto !important; }
@@ -341,14 +356,14 @@ if st.session_state.page == 'step1_location':
         coords = info['coords']
         color = info['color']
         
-        # 💡 모바일용 팝업 (터치 시 예쁜 이름표 등장)
+        # 💡 모바일 친화적 이름표 팝업 (터치 시 표시)
         popup_html = f"""
         <div style="background: rgba(0,0,0,0.8); border: 1px solid {color}; padding: 8px 12px; border-radius: 8px; color: #FFF; font-weight: 900; font-size: 12px; white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,0.5);">
-            {info['icon']} {name}
+            <span style="font-size:14px;">{info['icon']}</span> {name}
         </div>
         """
         
-        marker = folium.CircleMarker(location=coords, radius=6, color=color, fill=True, fillOpacity=0.9, weight=2)
+        marker = folium.CircleMarker(location=coords, radius=7, color=color, fill=True, fillOpacity=0.9, weight=2)
         marker.add_child(folium.Popup(popup_html))
         marker.add_to(m)
         
@@ -363,18 +378,20 @@ if st.session_state.page == 'step1_location':
         st.rerun()
 
 elif st.session_state.page == 'step2_course':
-    # 💡 [핵심] 상단에 에어비앤비 스타일 스와이프 갤러리 추가!
+    # 💡 [핵심] 상단 에어비앤비형 스와이프 갤러리 
     st.markdown("<h3>🎯 어디로 달려볼까요?</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='color:#8A8AA0; font-size:12px; margin-top:-10px; margin-bottom:10px; padding:0 20px;'>옆으로 스와이프하여 거점별 웰니스 시설을 확인해보세요.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#8A8AA0; font-size:12px; margin-top:-10px; margin-bottom:10px; padding:0 20px;'>스와이프하여 거점별 공간 및 테마를 탐색하세요.</p>", unsafe_allow_html=True)
     
     gallery_html = '<div class="gallery-container">'
     for h in hub_names:
         info = hubs_info[h]
-        facs = " ".join([f"<span class='fac-badge'>{f}</span>" for f in info['facilities']])
+        # 로컬 이미지 자동 변환
+        img_base64 = get_base64_image(info['image'])
+        facs = " ".join([f"<span class='fac-badge'>• {f}</span>" for f in info['facilities']])
         
         gallery_html += f"""
         <div class="gallery-card">
-            <img class="gallery-img" src="{info['image']}">
+            <img class="gallery-img" src="{img_base64}">
             <div class="gallery-title"><span style="color:{info['color']};">{info['icon']}</span> {h}</div>
             <div class="gallery-type" style="background:{info['bg']}; color:{info['color']};">{info['type']}</div>
             <div class="gallery-fac">{facs}</div>
@@ -383,15 +400,14 @@ elif st.session_state.page == 'step2_course':
     gallery_html += '</div>'
     st.markdown(gallery_html, unsafe_allow_html=True)
     
-    # 구분선
     st.markdown("<hr style='border: 1px dashed rgba(255,255,255,0.1); margin: 10px 20px 20px 20px;'>", unsafe_allow_html=True)
     
     with st.container():
-        start_hub = st.selectbox("📍 출발 거점 (자동선택됨)", hub_names, index=hub_names.index(st.session_state.nearest_hub))
+        start_hub = st.selectbox("📍 출발 거점", hub_names, index=hub_names.index(st.session_state.nearest_hub))
         mode = st.radio("🏃 코스 형태 선택", ["🚩 다른 거점으로 이동 (A to B)", "🔄 순환형 코스 (Loop)"])
         
         if mode == "🚩 다른 거점으로 이동 (A to B)":
-            end_drop = st.selectbox("🏁 도착 거점 (갤러리에서 고른 곳)", [h for h in hub_names if h != start_hub])
+            end_drop = st.selectbox("🏁 도착 거점 (갤러리 참조)", [h for h in hub_names if h != start_hub])
             via1 = st.selectbox("🔹 경유지 1 (선택)", ["선택 안 함"] + hub_names)
             via2 = st.selectbox("🔹 경유지 2 (선택)", ["선택 안 함"] + hub_names)
             
