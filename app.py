@@ -671,12 +671,12 @@ elif st.session_state.page == 'result':
         var mainLayer = L.featureGroup().addTo(map);
         var waterLayer = L.featureGroup().addTo(map);
 
-        // 💡 텍스트/툴팁 없는 순수 물방울 아이콘 생성 로직
+        // 💡 음수대 아이콘 심플 버전
         var waterIcon = L.divIcon({
-            html: '<div style="font-size: 16px; text-shadow: 0 0 5px rgba(0, 245, 255, 0.8);">💧</div>',
+            html: '💧',
             className: 'custom-water-icon',
-            iconSize: [10, 10],
-            iconAnchor: [10, 10]
+            iconSize: [12, 12],
+            iconAnchor: [6, 6]
         });
 
         fountainsData.forEach(f => {
