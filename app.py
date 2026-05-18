@@ -384,7 +384,7 @@ elif st.session_state.page == 'step2_course':
     st.markdown("<h3>🎯 어디로 달려볼까요?</h3>", unsafe_allow_html=True)
     
     # 💡 거점 정보 아코디언 (도착지 고르기 전 참고용)
-    with st.expander("📊 거점 시설 정보 모두 보기"):
+    with st.expander("📊 거점 시설 정보 보기"):
         for h in hub_names:
             info = hubs_info[h]
             img_base64 = get_base64_image(info['image'])
