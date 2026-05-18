@@ -53,19 +53,11 @@ st.markdown("""
         div[role="radiogroup"] label p { color: #FFFFFF !important; font-weight: 700 !important; font-size: 15px !important; }
         .stSelectbox > label { color: #8A8AA0; font-size: 12px; margin-bottom: -5px;}
         
-        /* 💡 스마트폰 하단 스와이프 갤러리 특화 CSS */
-        .gallery-container {
-            display: flex; overflow-x: auto; gap: 15px; padding: 10px 20px 20px 20px;
-            scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
-        }
-        .gallery-container::-webkit-scrollbar { display: none; }
-        .gallery-card {
-            min-width: 240px; flex: 0 0 auto; background: #1E1E2E; border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 16px; padding: 15px; scroll-snap-align: start; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
-        .gallery-img { width: 100%; height: 130px; object-fit: cover; border-radius: 10px; margin-bottom: 12px; }
-        .gallery-title { color: #FFF; font-size: 18px; font-weight: 900; margin-bottom: 5px; display: flex; align-items: center; gap: 6px;}
-        .gallery-type { font-size: 11px; font-weight: 800; margin-bottom: 12px; display: inline-block; padding: 4px 8px; border-radius: 6px;}
+        /* 💡 세로 스크롤 아코디언(Expander) CSS 조율 */
+        div[data-testid="stExpander"] { padding: 0 20px !important; }
+        div[data-testid="stExpander"] details { background: transparent !important; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; }
+        div[data-testid="stExpander"] summary { color: #FFF; font-weight: 800; }
+        
         .gallery-fac { font-size: 11px; color: #FFF; line-height: 1.6; }
         .fac-badge { background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 6px; display: inline-block; margin: 2px 2px 2px 0;}
     </style>
@@ -97,23 +89,16 @@ if 'sho_len' not in st.session_state: st.session_state.sho_len = 0
 if 'opt_well' not in st.session_state: st.session_state.opt_well = 0
 if 'sho_well' not in st.session_state: st.session_state.sho_well = 0
 
-# 💡 연구자님이 작성해주신 완벽한 거점 데이터
+# 💡 거점 데이터
 hubs_info = {
-    # 1. 교통 요충지형
     "옥수역": {"coords": (37.5413498, 127.0171347), "type": "교통 요충지형", "icon": "🚇", "color": "#39FF14", "bg": "rgba(57,255,20,0.15)", "image": "oksu.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함", "휴식 라운지"]},
     "왕십리역": {"coords": (37.5616302, 127.0351177), "type": "교통 요충지형", "icon": "🚉", "color": "#39FF14", "bg": "rgba(57,255,20,0.15)", "image": "wang.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함"]},
-    
-    # 2. 수변 관문형
     "금호나들목": {"coords": (37.5512902, 127.0356081), "type": "수변 관문형", "icon": "🌊", "color": "#00F5FF", "bg": "rgba(0,245,255,0.15)", "image": "ho.jpg", "facilities": ["야외 운동기구", "음수대", "물품보관함"]},
     "성덕정나들목": {"coords": (37.5375776, 127.0454704), "type": "수변 관문형", "icon": "🌉", "color": "#00F5FF", "bg": "rgba(0,245,255,0.15)", "image": "duck.jpg", "facilities": ["야외 운동기구", "음수대", "물품보관함", "야간 조명"]},
     "청구아파트나들목": {"coords": (37.5348428, 127.0552105), "type": "수변 관문형", "icon": "🌊", "color": "#00F5FF", "bg": "rgba(0,245,255,0.15)", "image": "gu.jpg", "facilities": ["음수대", "물품보관함", "야간 조명", "쿨링 미스트"]},
     "송정체육공원": {"coords": (37.5536442, 127.0672346), "type": "수변 관문형", "icon": "🌉", "color": "#00F5FF", "bg": "rgba(0,245,255,0.15)", "image": "song.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함"]},
-
-    # 3. 상권 / 트렌드형
     "서울숲역": {"coords": (37.5465240, 127.0429873), "type": "상권 / 트렌드형", "icon": "🛍️", "color": "#FF2D78", "bg": "rgba(255,45,120,0.15)", "image": "forest.jpg", "facilities": ["파클릿", "음수대", "물품보관함"]},
     "성삼공원": {"coords": (37.5420202, 127.0602789), "type": "상권 / 트렌드형", "icon": "☕", "color": "#FF2D78", "bg": "rgba(255,45,120,0.15)", "image": "sam.jpg", "facilities": ["파클릿", "음수대", "물품보관함"]},
-
-    # 4. 주거 밀착형
     "금옥공원": {"coords": (37.5534649, 127.0213021), "type": "주거 밀착형", "icon": "🏘️", "color": "#FFD700", "bg": "rgba(255,215,0,0.15)", "image": "gold.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함", "휴식 라운지"]},
     "꽃재공원": {"coords": (37.5672965, 127.0282145), "type": "주거 밀착형", "icon": "🏡", "color": "#FFD700", "bg": "rgba(255,215,0,0.15)", "image": "flower.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함"]},
     "용답마을마당": {"coords": (37.5619688, 127.0517828), "type": "주거 밀착형", "icon": "🏘️", "color": "#FFD700", "bg": "rgba(255,215,0,0.15)", "image": "yong.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함", "휴식 라운지"]},
@@ -129,7 +114,6 @@ def load_boundary():
         seoul_geo = requests.get(url).json()
         sd_features = [f for f in seoul_geo['features'] if f['properties']['name'] == '성동구']
         
-        # 좌표 강제 이동(Shift) 로직 유지
         lon_shift = -0.0037 
         lat_shift = 0.0028      
         
@@ -339,7 +323,7 @@ if st.session_state.page == 'step1_location':
         <div style="margin: 5px 20px 20px 20px; background: linear-gradient(135deg, rgba(0,245,255,0.15) 0%, rgba(0,0,0,0) 100%); border: 1px solid rgba(0,245,255,0.2); border-radius: 20px; padding: 22px; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
             <div style="position: absolute; right: -15px; bottom: -20px; font-size: 110px; opacity: 0.1; transform: rotate(-15deg);">👟</div>
             <h2 style="margin: 0 0 8px 0; color: #FFF; font-size: 26px; font-weight: 900; letter-spacing: -1px;">Ready to Run?</h2>
-            <p style="margin: 0 0 16px 0; color: #8A8AA0; font-size: 13px; line-height: 1.4;">지도에서 <b>출발할 위치</b>를 탭하여<br>최적의 웰니스 러닝 코스를 탐색하세요.</p>
+            <p style="margin: 0 0 16px 0; color: #8A8AA0; font-size: 13px; line-height: 1.4;">지도에서 <b>출발할 위치</b>를 탭하여<br>최적의 웰니스 러닝 코스를 탐색하세요.<br>마커를 탭하면 상세 정보를 볼 수 있습니다.</p>
         </div>
     """, unsafe_allow_html=True)
     
@@ -365,9 +349,13 @@ if st.session_state.page == 'step1_location':
         coords = info['coords']
         color = info['color']
         
+        # 💡 거점 정보 상세보기 팝업 개선 & 아이콘 제거
         popup_html = f"""
-        <div style="background: rgba(0,0,0,0.8); border: 1px solid {color}; padding: 8px 12px; border-radius: 8px; color: #FFF; font-weight: 900; font-size: 12px; white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,0.5);">
-            <span style="font-size:14px;">{info['icon']}</span> {name}
+        <div style="background: rgba(20,20,30,0.95); border: 1px solid {color}; padding: 12px; border-radius: 12px; color: #FFF; width: 170px; box-shadow: 0 4px 15px rgba(0,0,0,0.6);">
+            <div style="font-weight: 900; font-size: 15px; margin-bottom: 8px; text-align: center; color: {color};">{name}</div>
+            <img src="{get_base64_image(info['image'])}" style="width: 100%; height: 85px; object-fit: cover; border-radius: 6px; margin-bottom: 8px;">
+            <div style="font-size: 11px; color: #CCC; margin-bottom: 4px;"><b>유형:</b> {info['type']}</div>
+            <div style="font-size: 11px; color: #CCC; line-height: 1.4;"><b>시설:</b> {", ".join(info['facilities'])}</div>
         </div>
         """
         
@@ -376,36 +364,40 @@ if st.session_state.page == 'step1_location':
         marker.add_to(m)
         
     map_data = st_folium(m, height=450, use_container_width=True)
-    
     st.markdown("</div>", unsafe_allow_html=True)
     
+    # 클릭 시 자동 이동하지 않고 현 위치만 세션에 저장
     if map_data and map_data.get('last_clicked'):
         lat, lon = map_data['last_clicked']['lat'], map_data['last_clicked']['lng']
         st.session_state.user_location = (lat, lon)
         st.session_state.nearest_hub = get_nearest_hub(lat, lon)
-        st.session_state.page = 'step2_course'
-        st.rerun()
+        
+    if st.session_state.user_location:
+        st.markdown("<div style='padding: 10px 20px; color:#39FF14; font-size:14px; font-weight:bold; text-align:center;'>📍 출발 위치가 맵에 등록되었습니다!</div>", unsafe_allow_html=True)
+        if st.button("다음 : 코스 및 설정하기 🚀", type="primary"):
+            st.session_state.page = 'step2_course'
+            st.rerun()
 
 elif st.session_state.page == 'step2_course':
     st.markdown("<h3>🎯 어디로 달려볼까요?</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='color:#8A8AA0; font-size:12px; margin-top:-10px; margin-bottom:10px; padding:0 20px;'>스와이프하여 거점별 공간 및 테마를 탐색하세요.</p>", unsafe_allow_html=True)
     
-    gallery_html = '<div class="gallery-container">'
-    for h in hub_names:
-        info = hubs_info[h]
-        img_base64 = get_base64_image(info['image'])
-        facs = " ".join([f"<span class='fac-badge'>• {f}</span>" for f in info['facilities']])
-        
-        gallery_html += f"""
-        <div class="gallery-card">
-            <img class="gallery-img" src="{img_base64}">
-            <div class="gallery-title"><span style="color:{info['color']};">{info['icon']}</span> {h}</div>
-            <div class="gallery-type" style="background:{info['bg']}; color:{info['color']};">{info['type']}</div>
-            <div class="gallery-fac">{facs}</div>
-        </div>
-        """
-    gallery_html += '</div>'
-    st.markdown(gallery_html, unsafe_allow_html=True)
+    # 💡 가로 스와이프 대신 세로 스크롤 가능한 아코디언 토글 추가
+    with st.expander("거점 정보 보기 🔍"):
+        for h in hub_names:
+            info = hubs_info[h]
+            img_base64 = get_base64_image(info['image'])
+            facs = " ".join([f"<span class='fac-badge'>• {f}</span>" for f in info['facilities']])
+            
+            st.markdown(f"""
+            <div style="background: #1E1E2E; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; margin-bottom: 12px; display: flex; gap: 12px;">
+                <img src="{img_base64}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px;">
+                <div style="flex: 1;">
+                    <div style="color: #FFF; font-size: 16px; font-weight: 900; margin-bottom: 4px;">{h}</div>
+                    <div style="font-size: 11px; font-weight: 800; margin-bottom: 8px; display: inline-block; padding: 3px 6px; border-radius: 4px; background: {info['bg']}; color: {info['color']};">{info['type']}</div>
+                    <div style="font-size: 11px; color: #CCC; line-height: 1.4;">{facs}</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
     
     st.markdown("<hr style='border: 1px dashed rgba(255,255,255,0.1); margin: 10px 20px 20px 20px;'>", unsafe_allow_html=True)
     
@@ -414,7 +406,7 @@ elif st.session_state.page == 'step2_course':
         mode = st.radio("🏃 코스 형태 선택", ["🚩 다른 거점으로 이동 (A to B)", "🔄 순환형 코스 (Loop)"])
         
         if mode == "🚩 다른 거점으로 이동 (A to B)":
-            end_drop = st.selectbox("🏁 도착 거점 (갤러리 참조)", [h for h in hub_names if h != start_hub])
+            end_drop = st.selectbox("🏁 도착 거점", [h for h in hub_names if h != start_hub])
             via1 = st.selectbox("🔹 경유지 1 (선택)", ["선택 안 함"] + hub_names)
             via2 = st.selectbox("🔹 경유지 2 (선택)", ["선택 안 함"] + hub_names)
             
@@ -572,15 +564,15 @@ elif st.session_state.page == 'result':
             }
             .label-tooltip::before, .label-tooltip::after { display: none !important; }
 
-            /* 💡 음수대 아이콘 커스텀 스타일 (배경 둥글게, 이모지 크기 조정) */
+            /* 💡 음수대 아이콘 심플하게 원복 및 축소 */
             .custom-water-icon { 
-                background-color: rgba(0, 191, 255, 0.2) !important; 
-                border: 1px solid rgba(0, 191, 255, 0.8) !important;
-                border-radius: 50% !important; 
                 display: flex !important; 
                 justify-content: center !important; 
                 align-items: center !important;
-                box-shadow: 0 0 8px rgba(0, 191, 255, 0.5) !important;
+                font-size: 10px !important; /* 극도로 작게 */
+                background: none !important;
+                border: none !important;
+                box-shadow: none !important;
             }
 
             .bottom-sheet { 
@@ -735,12 +727,12 @@ elif st.session_state.page == 'result':
         var mainLayer = L.featureGroup().addTo(map);
         var waterLayer = L.featureGroup().addTo(map);
 
-        // 💡 음수대 아이콘 수정 (해파리알 -> 세련된 푸른색 반투명 동그라미 속에 💧)
+        // 💡 음수대 아이콘 심플 버전
         var waterIcon = L.divIcon({
-            html: '<div style="font-size: 11px;">💧</div>',
+            html: '💧',
             className: 'custom-water-icon',
-            iconSize: [22, 22],
-            iconAnchor: [11, 11]
+            iconSize: [12, 12],
+            iconAnchor: [6, 6]
         });
 
         fountainsData.forEach(f => {
