@@ -31,6 +31,19 @@ st.markdown("""
         header { display: none !important; }
         footer { display: none !important; }
         iframe { border: none !important; width: 100% !important; border-radius: 0 0 24px 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+
+        /* 💡 스트림릿 실행(로딩) 중 화면 어두워짐 및 깜빡임 방지 */
+        div[data-testid="stAppViewBlockContainer"] {
+            opacity: 1 !important;
+            transition: none !important;
+        }
+        div[data-testid="stAppViewContainer"] > div:first-child {
+            background: transparent !important;
+        }
+        div[data-testid="stStatusWidget"] {
+            display: none !important;
+        }
+
         
         div[data-testid="stSelectbox"], div[data-testid="stRadio"] { padding: 0 20px !important; box-sizing: border-box; }
         
