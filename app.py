@@ -6,6 +6,7 @@ import math
 import json
 import folium
 import requests
+import base64
 from pyproj import Transformer
 from streamlit_folium import st_folium
 import streamlit.components.v1 as components
@@ -13,6 +14,16 @@ import os
 
 # --- 1. 앱 설정 및 커스텀 CSS ---
 st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
+
+# 💡 이미지를 안전하게 불러오는 함수 (images 폴더 경로 포함)
+def get_base64_image(image_filename):
+    # images 폴더 안에 있는 파일을 찾도록 경로를 지정합니다.
+    image_path = os.path.join("images", image_filename)
+    try:
+        with open(image_path, "rb") as img_file:
+            return "data:image/jpeg;base64," + base64.b64encode(img_file.read()).decode()
+    except:
+        return "https://via.placeholder.com/300x200/1E1E2E/FFFFFF?text=Image+Not+Found"
 
 st.markdown("""
     <style>
@@ -37,10 +48,18 @@ st.markdown("""
             padding: 14px !important; font-size: 15px !important; margin-top: 10px !important;
         }
         
-        .stMarkdown h3 { color: #FFFFFF; padding: 20px 20px 10px 20px; font-size: 22px; font-weight: 800;}
+        .stMarkdown h3 { color: #FFFFFF; padding: 20px 20px 10px 20px; font-size: 22px; font-weight: 800; margin-bottom: 0;}
         .stRadio > label { color: #8A8AA0 !important; font-size: 12px; margin-bottom: 5px; }
         div[role="radiogroup"] label p { color: #FFFFFF !important; font-weight: 700 !important; font-size: 15px !important; }
         .stSelectbox > label { color: #8A8AA0; font-size: 12px; margin-bottom: -5px;}
+        
+        /* 💡 세로 스크롤 아코디언(Expander) CSS 조율 */
+        div[data-testid="stExpander"] { padding: 0 20px !important; }
+        div[data-testid="stExpander"] details { background: transparent !important; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; }
+        div[data-testid="stExpander"] summary { color: #FFF; font-weight: 800; }
+        
+        .gallery-fac { font-size: 11px; color: #FFF; line-height: 1.6; }
+        .fac-badge { background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 6px; display: inline-block; margin: 2px 2px 2px 0;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -70,18 +89,24 @@ if 'sho_len' not in st.session_state: st.session_state.sho_len = 0
 if 'opt_well' not in st.session_state: st.session_state.opt_well = 0
 if 'sho_well' not in st.session_state: st.session_state.sho_well = 0
 
+# 💡 거점 데이터
 hubs_info = {
-    "옥수역": (37.5413498, 127.0171347), "왕십리역": (37.5616302, 127.0351177),
-    "금호나들목": (37.5512902, 127.0356081), "성덕정나들목": (37.5375776, 127.0454704),
-    "청구아파트나들목": (37.5348428, 127.0552105), "송정체육공원": (37.5536442, 127.0672346),
-    "서울숲역": (37.5465240, 127.0429873), "성삼공원": (37.5420202, 127.0602789),
-    "금옥공원": (37.5534649, 127.0213021), "꽃재공원": (37.5672965, 127.0282145),
-    "용답마을마당": (37.5619688, 127.0517828), "향림소공원": (37.5467465, 127.0534440)
+    "옥수역": {"coords": (37.5413498, 127.0171347), "type": "교통 요충지형", "icon": "🚇", "color": "#39FF14", "bg": "rgba(57,255,20,0.15)", "image": "oksu.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함", "휴식 라운지"]},
+    "왕십리역": {"coords": (37.5616302, 127.0351177), "type": "교통 요충지형", "icon": "🚉", "color": "#39FF14", "bg": "rgba(57,255,20,0.15)", "image": "wang.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함"]},
+    "금호나들목": {"coords": (37.5512902, 127.0356081), "type": "수변 관문형", "icon": "🌊", "color": "#00F5FF", "bg": "rgba(0,245,255,0.15)", "image": "ho.jpg", "facilities": ["야외 운동기구", "음수대", "물품보관함"]},
+    "성덕정나들목": {"coords": (37.5375776, 127.0454704), "type": "수변 관문형", "icon": "🌉", "color": "#00F5FF", "bg": "rgba(0,245,255,0.15)", "image": "duck.jpg", "facilities": ["야외 운동기구", "음수대", "물품보관함", "야간 조명"]},
+    "청구아파트나들목": {"coords": (37.5348428, 127.0552105), "type": "수변 관문형", "icon": "🌊", "color": "#00F5FF", "bg": "rgba(0,245,255,0.15)", "image": "gu.jpg", "facilities": ["음수대", "물품보관함", "야간 조명", "쿨링 미스트"]},
+    "송정체육공원": {"coords": (37.5536442, 127.0672346), "type": "수변 관문형", "icon": "🌉", "color": "#00F5FF", "bg": "rgba(0,245,255,0.15)", "image": "song.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함"]},
+    "서울숲역": {"coords": (37.5465240, 127.0429873), "type": "상권 / 트렌드형", "icon": "🛍️", "color": "#FF2D78", "bg": "rgba(255,45,120,0.15)", "image": "forest.jpg", "facilities": ["파클릿", "음수대", "물품보관함"]},
+    "성삼공원": {"coords": (37.5420202, 127.0602789), "type": "상권 / 트렌드형", "icon": "☕", "color": "#FF2D78", "bg": "rgba(255,45,120,0.15)", "image": "sam.jpg", "facilities": ["파클릿", "음수대", "물품보관함"]},
+    "금옥공원": {"coords": (37.5534649, 127.0213021), "type": "주거 밀착형", "icon": "🏘️", "color": "#FFD700", "bg": "rgba(255,215,0,0.15)", "image": "gold.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함", "휴식 라운지"]},
+    "꽃재공원": {"coords": (37.5672965, 127.0282145), "type": "주거 밀착형", "icon": "🏡", "color": "#FFD700", "bg": "rgba(255,215,0,0.15)", "image": "flower.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함"]},
+    "용답마을마당": {"coords": (37.5619688, 127.0517828), "type": "주거 밀착형", "icon": "🏘️", "color": "#FFD700", "bg": "rgba(255,215,0,0.15)", "image": "yong.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함", "휴식 라운지"]},
+    "향림소공원": {"coords": (37.5467465, 127.0534440), "type": "주거 밀착형", "icon": "🏡", "color": "#FFD700", "bg": "rgba(255,215,0,0.15)", "image": "lim.jpg", "facilities": ["운동시설", "음수대", "물품보관함"]}
 }
 hub_names = list(hubs_info.keys())
 
 # --- 3. 데이터 로드 엔진 ---
-@st.cache_data
 @st.cache_data
 def load_boundary():
     try:
@@ -89,26 +114,21 @@ def load_boundary():
         seoul_geo = requests.get(url).json()
         sd_features = [f for f in seoul_geo['features'] if f['properties']['name'] == '성동구']
         
-        # --- [좌표 강제 이동(Shift) 로직 추가] ---
-        # 갈색 경로에 맞게 점선을 전체적으로 왼쪽으로 이동시킵니다.
-        # 화면에 맞춰 lon_shift 값을 미세 조정해 보세요. (음수: 왼쪽, 양수: 오른쪽)
         lon_shift = -0.0037 
-        lat_shift = 0.0028     
+        lat_shift = 0.0028      
         
         def shift_coords(coords):
-            # 가장 안쪽의 [경도, 위도] 좌표 쌍인 경우
             if isinstance(coords[0], (int, float)):
                 return [coords[0] + lon_shift, coords[1] + lat_shift]
-            # 중첩된 폴리곤 리스트인 경우 재귀적으로 적용
             return [shift_coords(c) for c in coords]
         
         for feature in sd_features:
             feature['geometry']['coordinates'] = shift_coords(feature['geometry']['coordinates'])
-        # ----------------------------------------
             
         return {'type': 'FeatureCollection', 'features': sd_features}
     except Exception as e: 
         return None
+
 @st.cache_data
 def load_fountain_data():
     try:
@@ -203,7 +223,7 @@ def get_nearest_node(lon, lat):
     return min(node_coords.keys(), key=lambda n: math.sqrt((node_coords[n][0]-lon)**2 + (node_coords[n][1]-lat)**2))
 
 def get_nearest_hub(lat, lon):
-    return min(hubs_info.keys(), key=lambda h: math.sqrt((hubs_info[h][0]-lat)**2 + (hubs_info[h][1]-lon)**2))
+    return min(hubs_info.keys(), key=lambda h: math.sqrt((hubs_info[h]['coords'][0]-lat)**2 + (hubs_info[h]['coords'][1]-lon)**2))
 
 def extract_real_geometry(path):
     segments = []
@@ -303,30 +323,21 @@ if st.session_state.page == 'step1_location':
         <div style="margin: 5px 20px 20px 20px; background: linear-gradient(135deg, rgba(0,245,255,0.15) 0%, rgba(0,0,0,0) 100%); border: 1px solid rgba(0,245,255,0.2); border-radius: 20px; padding: 22px; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
             <div style="position: absolute; right: -15px; bottom: -20px; font-size: 110px; opacity: 0.1; transform: rotate(-15deg);">👟</div>
             <h2 style="margin: 0 0 8px 0; color: #FFF; font-size: 26px; font-weight: 900; letter-spacing: -1px;">Ready to Run?</h2>
-            <p style="margin: 0 0 16px 0; color: #8A8AA0; font-size: 13px; line-height: 1.4;">지도에서 <b>현재 위치</b>를 탭하여<br>최적의 웰니스 러닝 코스를 탐색하세요.</p>
-            <div style="display: flex; gap: 8px;">
-                <span style="background: rgba(57, 255, 20, 0.15); color: #39FF14; border: 1px solid rgba(57,255,20,0.3); padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;">🌤️ 18°C 맑음</span>
-                <span style="background: rgba(255, 45, 120, 0.15); color: #FF2D78; border: 1px solid rgba(255,45,120,0.3); padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;">🍃 대기질 최고</span>
-            </div>
+            <p style="margin: 0 0 16px 0; color: #8A8AA0; font-size: 13px; line-height: 1.4;">지도에서 <b>출발할 위치</b>를 탭하여<br>최적의 웰니스 러닝 코스를 탐색하세요.<br>마커를 탭하면 상세 정보를 볼 수 있습니다.</p>
         </div>
     """, unsafe_allow_html=True)
     
     st.markdown("<div style='padding: 0 20px;'>", unsafe_allow_html=True)
     
-    # 💡 지도 시작 위치 수정 (127.04 -> 127.042)로 변경하여 치우침 해결
-    m = folium.Map(location=[37.553, 127.042], zoom_start=13.5, tiles=None, zoom_control=False)
+    m = folium.Map(location=[37.55, 127.04], zoom_start=14, tiles=None, zoom_control=False)
     folium.TileLayer('CartoDB dark_matter', attr=' ').add_to(m)
     
     css_injection = """
     <style>
         .leaflet-control-attribution { display: none !important; visibility: hidden !important; }
-        .label-tooltip {
-            background: transparent !important; border: none !important; box-shadow: none !important;
-            color: #FFFFFF !important; font-weight: 800 !important; font-size: 10px !important;
-            text-shadow: 0 0 5px #000, 0 0 10px #000 !important; margin-top: -5px !important;
-            white-space: nowrap !important; text-align: center !important; pointer-events: none;
-        }
-        .label-tooltip::before, .label-tooltip::after { display: none !important; }
+        .leaflet-popup-content-wrapper { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
+        .leaflet-popup-tip { display: none !important; }
+        .leaflet-popup-content { margin: 0 !important; width: auto !important; }
     </style>
     """
     m.get_root().header.add_child(folium.Element(css_injection))
@@ -334,15 +345,27 @@ if st.session_state.page == 'step1_location':
     if sd_boundary:
         folium.GeoJson(sd_boundary, style_function=lambda x: {'color': 'white', 'fillColor': 'transparent', 'weight': 2, 'opacity': 0.6, 'dashArray':'5,5'}).add_to(m)
 
-    for name, coords in hubs_info.items():
-        marker = folium.CircleMarker(location=coords, radius=5, color='#00F5FF', fill=True, fillOpacity=0.8)
-        marker.add_child(folium.Tooltip(name, permanent=True, direction='top', className='label-tooltip'))
+    for name, info in hubs_info.items():
+        coords = info['coords']
+        color = info['color']
+        
+        popup_html = f"""
+        <div style="background: rgba(20,20,30,0.95); border: 1px solid {color}; padding: 12px; border-radius: 12px; color: #FFF; width: 170px; box-shadow: 0 4px 15px rgba(0,0,0,0.6);">
+            <div style="font-weight: 900; font-size: 15px; margin-bottom: 8px; text-align: center; color: {color};">{name}</div>
+            <img src="{get_base64_image(info['image'])}" style="width: 100%; height: 85px; object-fit: cover; border-radius: 6px; margin-bottom: 8px;">
+            <div style="font-size: 11px; color: #CCC; margin-bottom: 4px;"><b>유형:</b> {info['type']}</div>
+            <div style="font-size: 11px; color: #CCC; line-height: 1.4;"><b>시설:</b> {", ".join(info['facilities'])}</div>
+        </div>
+        """
+        
+        marker = folium.CircleMarker(location=coords, radius=7, color=color, fill=True, fillOpacity=0.9, weight=2)
+        marker.add_child(folium.Popup(popup_html))
         marker.add_to(m)
         
     map_data = st_folium(m, height=450, use_container_width=True)
-    
     st.markdown("</div>", unsafe_allow_html=True)
     
+    # 💡 이전처럼 지도를 터치하면 자동으로 두번째 창으로 넘어가도록 원복!
     if map_data and map_data.get('last_clicked'):
         lat, lon = map_data['last_clicked']['lat'], map_data['last_clicked']['lng']
         st.session_state.user_location = (lat, lon)
@@ -351,16 +374,35 @@ if st.session_state.page == 'step1_location':
         st.rerun()
 
 elif st.session_state.page == 'step2_course':
-    st.markdown("<h3>🏃‍♂️ 러닝 코스</h3>", unsafe_allow_html=True)
+    st.markdown("<h3>🎯 어디로 달려볼까요?</h3>", unsafe_allow_html=True)
+    
+    with st.expander("거점 정보 보기 🔍"):
+        for h in hub_names:
+            info = hubs_info[h]
+            img_base64 = get_base64_image(info['image'])
+            facs = " ".join([f"<span class='fac-badge'>• {f}</span>" for f in info['facilities']])
+            
+            st.markdown(f"""
+            <div style="background: #1E1E2E; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; margin-bottom: 12px; display: flex; gap: 12px;">
+                <img src="{img_base64}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px;">
+                <div style="flex: 1;">
+                    <div style="color: #FFF; font-size: 16px; font-weight: 900; margin-bottom: 4px;">{h}</div>
+                    <div style="font-size: 11px; font-weight: 800; margin-bottom: 8px; display: inline-block; padding: 3px 6px; border-radius: 4px; background: {info['bg']}; color: {info['color']};">{info['type']}</div>
+                    <div style="font-size: 11px; color: #CCC; line-height: 1.4;">{facs}</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    st.markdown("<hr style='border: 1px dashed rgba(255,255,255,0.1); margin: 10px 20px 20px 20px;'>", unsafe_allow_html=True)
     
     with st.container():
         start_hub = st.selectbox("📍 출발 거점", hub_names, index=hub_names.index(st.session_state.nearest_hub))
-        mode = st.radio("코스 모드", ["🚩 다른 거점으로 이동 (A to B)", "🔄 순환형 코스 (Loop)"])
+        mode = st.radio("🏃 코스 형태 선택", ["🚩 다른 거점으로 이동 (A to B)", "🔄 순환형 코스 (Loop)"])
         
         if mode == "🚩 다른 거점으로 이동 (A to B)":
+            end_drop = st.selectbox("🏁 도착 거점", [h for h in hub_names if h != start_hub])
             via1 = st.selectbox("🔹 경유지 1 (선택)", ["선택 안 함"] + hub_names)
             via2 = st.selectbox("🔹 경유지 2 (선택)", ["선택 안 함"] + hub_names)
-            end_drop = st.selectbox("🏁 도착 거점", [h for h in hub_names if h != start_hub])
             
             if st.button("경로 탐색 🚀", type="primary"):
                 with st.spinner("최적 경로 계산 중..."):
@@ -371,7 +413,7 @@ elif st.session_state.page == 'step2_course':
                     
                     u_lat, u_lon = st.session_state.user_location
                     user_node = get_nearest_node(u_lon, u_lat)
-                    first_hub_node = get_nearest_node(hubs_info[start_hub][1], hubs_info[start_hub][0])
+                    first_hub_node = get_nearest_node(hubs_info[start_hub]['coords'][1], hubs_info[start_hub]['coords'][0])
                     
                     try: 
                         p_app = nx.shortest_path(G, source=user_node, target=first_hub_node, weight='length')
@@ -386,8 +428,8 @@ elif st.session_state.page == 'step2_course':
                     sho_stats_acc = {c: 0.0 for c in criteria_cols}
                     
                     for i in range(len(seq)-1):
-                        s_node = get_nearest_node(hubs_info[seq[i]][1], hubs_info[seq[i]][0])
-                        e_node = get_nearest_node(hubs_info[seq[i+1]][1], hubs_info[seq[i+1]][0])
+                        s_node = get_nearest_node(hubs_info[seq[i]]['coords'][1], hubs_info[seq[i]]['coords'][0])
+                        e_node = get_nearest_node(hubs_info[seq[i+1]]['coords'][1], hubs_info[seq[i+1]]['coords'][0])
                         
                         try: 
                             p_o = get_pareto_optimal_path(G, s_node, e_node, min_ratio=1.0, max_ratio=1.5)
@@ -421,7 +463,7 @@ elif st.session_state.page == 'step2_course':
                     st.session_state.sho_well = sho_well_acc
                     
                     markers = [{"name": "현 위치", "lat": u_lat, "lon": u_lon, "color": "#FF9500"}]
-                    for h in set(seq): markers.append({"name": h, "lat": hubs_info[h][0], "lon": hubs_info[h][1], "color": "#00F5FF" if h==start_hub else "#FF2D78"})
+                    for h in set(seq): markers.append({"name": h, "lat": hubs_info[h]['coords'][0], "lon": hubs_info[h]['coords'][1], "color": hubs_info[h]['color']})
                     st.session_state.marker_data = markers
                     
                     st.session_state.page = 'result'
@@ -438,7 +480,7 @@ elif st.session_state.page == 'step2_course':
                     with st.spinner("경로 계산 중..."):
                         u_lat, u_lon = st.session_state.user_location
                         user_node = get_nearest_node(u_lon, u_lat)
-                        start_hub_node = get_nearest_node(hubs_info[start_hub][1], hubs_info[start_hub][0])
+                        start_hub_node = get_nearest_node(hubs_info[start_hub]['coords'][1], hubs_info[start_hub]['coords'][0])
                         
                         try: 
                             p_app = nx.shortest_path(G, source=user_node, target=start_hub_node, weight='length')
@@ -460,7 +502,7 @@ elif st.session_state.page == 'step2_course':
                         
                         st.session_state.marker_data = [
                             {"name": "현 위치", "lat": u_lat, "lon": u_lon, "color": "#FF9500"},
-                            {"name": start_hub, "lat": hubs_info[start_hub][0], "lon": hubs_info[start_hub][1], "color": "#39FF14"}
+                            {"name": start_hub, "lat": hubs_info[start_hub]['coords'][0], "lon": hubs_info[start_hub]['coords'][1], "color": hubs_info[start_hub]['color']}
                         ]
                         
                         st.session_state.page = 'result'
@@ -476,7 +518,7 @@ elif st.session_state.page == 'result':
     sho_json = json.dumps(st.session_state.main_sho_segments)
     loop_json = json.dumps(st.session_state.loop_segments)
     markers_json = json.dumps(st.session_state.marker_data)
-    fountains_json = json.dumps(fountains_data)
+    fountains_json = json.dumps(fountains_data) 
     boundary_json = json.dumps(sd_boundary) if sd_boundary else "null"
     
     opt_stats_json = json.dumps(st.session_state.get('opt_stats', {c: 0.0 for c in criteria_cols}))
@@ -516,8 +558,15 @@ elif st.session_state.page == 'result':
             }
             .label-tooltip::before, .label-tooltip::after { display: none !important; }
 
-            /* 💡 물방울 아이콘용 투명 CSS */
-            .custom-water-icon { background: none !important; border: none !important; }
+            .custom-water-icon { 
+                display: flex !important; 
+                justify-content: center !important; 
+                align-items: center !important;
+                font-size: 10px !important;
+                background: none !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
 
             .bottom-sheet { 
                 position: absolute; bottom: 0; left: 0; width: 100%; 
@@ -563,7 +612,8 @@ elif st.session_state.page == 'result':
         <div class="toggle-panel">
             <button id="btn-app" class="toggle-btn active" onclick="toggleLayer('app')">🚶‍♂️ 접근</button>
             <button id="btn-main" class="toggle-btn active" onclick="toggleLayer('main')">🏃 코스</button>
-            <button id="btn-water" class="toggle-btn active" onclick="toggleLayer('water')">💧 음수대</button>
+            <!-- 💡 음수대 기본 상태 꺼짐(active 클래스 제거) -->
+            <button id="btn-water" class="toggle-btn" onclick="toggleLayer('water')">💧 음수대</button>
         </div>
 
         <div class="stats-grid">
@@ -669,9 +719,10 @@ elif st.session_state.page == 'result':
 
         var appLayer = L.featureGroup().addTo(map);
         var mainLayer = L.featureGroup().addTo(map);
-        var waterLayer = L.featureGroup().addTo(map);
+        
+        // 💡 음수대 레이어 기본적으로 맵에 추가(addTo)하지 않음
+        var waterLayer = L.featureGroup();
 
-        // 💡 음수대 아이콘 심플 버전
         var waterIcon = L.divIcon({
             html: '💧',
             className: 'custom-water-icon',
@@ -680,8 +731,7 @@ elif st.session_state.page == 'result':
         });
 
         fountainsData.forEach(f => {
-            // bindTooltip을 아예 제거하여 호버/드래그 시 아무 텍스트도 뜨지 않게 설정
-            L.marker([f.lat, f.lon], { icon: waterIcon }).addTo(waterLayer);
+            L.marker([f.lat, f.lon], { icon: waterIcon, interactive: false }).addTo(waterLayer);
         });
 
         markers.forEach(m => {
@@ -746,7 +796,9 @@ elif st.session_state.page == 'result':
         
         setTimeout(() => map.fitBounds(mainLayer.getBounds(), { paddingBottomRight: [0, 300], paddingTopLeft: [20, 50] }), 500);
 
-        var appVis = true, mainVis = true, waterVis = true;
+        // 💡 waterVis 초기값을 false로 설정
+        var appVis = true, mainVis = true, waterVis = false;
+        
         function toggleLayer(type) {
             if(type === 'app') {
                 appVis = !appVis;
@@ -824,3 +876,4 @@ elif st.session_state.page == 'result':
     app_html = app_html.replace("___SHO_WELL_VAL___", str(sho_well_val))
 
     components.html(app_html, height=900, scrolling=False)
+
