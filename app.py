@@ -407,9 +407,9 @@ elif st.session_state.page == 'step2_course':
         mode = st.radio("🏃 코스 형태 선택", ["🚩 다른 거점으로 이동 (A to B)", "🔄 순환형 코스 (Loop)"])
         
         if mode == "🚩 다른 거점으로 이동 (A to B)":
+               end_drop = st.selectbox("🏁 도착 거점", [h for h in hub_names if h != start_hub])
             via1 = st.selectbox("🔹 경유지 1 (선택)", ["선택 안 함"] + hub_names)
             via2 = st.selectbox("🔹 경유지 2 (선택)", ["선택 안 함"] + hub_names)
-             end_drop = st.selectbox("🏁 도착 거점", [h for h in hub_names if h != start_hub])
              
             if st.button("경로 탐색 🚀", type="primary"):
                 with st.spinner("최적 경로 계산 중..."):
