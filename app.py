@@ -17,7 +17,6 @@ st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
 
 # 💡 이미지를 안전하게 불러오는 함수 (images 폴더 경로 포함)
 def get_base64_image(image_filename):
-    # images 폴더 안에 있는 파일을 찾도록 경로를 지정합니다.
     image_path = os.path.join("images", image_filename)
     try:
         with open(image_path, "rb") as img_file:
@@ -31,19 +30,11 @@ st.markdown("""
         header { display: none !important; }
         footer { display: none !important; }
         iframe { border: none !important; width: 100% !important; border-radius: 0 0 24px 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-
-        /* 💡 스트림릿 실행(로딩) 중 화면 어두워짐 및 깜빡임 방지 */
-        div[data-testid="stAppViewBlockContainer"] {
-            opacity: 1 !important;
-            transition: none !important;
-        }
-        div[data-testid="stAppViewContainer"] > div:first-child {
-            background: transparent !important;
-        }
-        div[data-testid="stStatusWidget"] {
-            display: none !important;
-        }
-
+        
+        /* 💡 스트림릿 실행(로딩) 중 화면 어두워짐 및 깜빡임 원천 차단 */
+        div[data-testid="stAppViewBlockContainer"] { opacity: 1 !important; transition: none !important; }
+        div[data-testid="stAppViewContainer"] > div:first-child { background: transparent !important; }
+        div[data-testid="stStatusWidget"] { display: none !important; }
         
         div[data-testid="stSelectbox"], div[data-testid="stRadio"] { padding: 0 20px !important; box-sizing: border-box; }
         
@@ -66,7 +57,6 @@ st.markdown("""
         div[role="radiogroup"] label p { color: #FFFFFF !important; font-weight: 700 !important; font-size: 15px !important; }
         .stSelectbox > label { color: #8A8AA0; font-size: 12px; margin-bottom: -5px;}
         
-        /* 💡 세로 스크롤 아코디언(Expander) CSS 조율 */
         div[data-testid="stExpander"] { padding: 0 20px !important; }
         div[data-testid="stExpander"] details { background: transparent !important; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; }
         div[data-testid="stExpander"] summary { color: #FFF; font-weight: 800; }
@@ -336,13 +326,17 @@ if st.session_state.page == 'step1_location':
         <div style="margin: 5px 20px 20px 20px; background: linear-gradient(135deg, rgba(0,245,255,0.15) 0%, rgba(0,0,0,0) 100%); border: 1px solid rgba(0,245,255,0.2); border-radius: 20px; padding: 22px; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
             <div style="position: absolute; right: -15px; bottom: -20px; font-size: 110px; opacity: 0.1; transform: rotate(-15deg);">👟</div>
             <h2 style="margin: 0 0 8px 0; color: #FFF; font-size: 26px; font-weight: 900; letter-spacing: -1px;">Ready to Run?</h2>
-            <p style="margin: 0 0 16px 0; color: #8A8AA0; font-size: 13px; line-height: 1.4;">지도에서 <b>출발할 위치</b>를 탭하여<br>최적의 웰니스 러닝 코스를 탐색하세요.<br>마커를 탭하면 상세 정보를 볼 수 있습니다.</p>
+            <p style="margin: 0 0 16px 0; color: #8A8AA0; font-size: 13px; line-height: 1.4;">지도에서 <b>현재 위치</b>를 탭하여<br>최적의 웰니스 러닝 코스를 탐색하세요.<br>거점 마커를 누르면 상세정보가 뜹니다.</p>
+            <div style="display: flex; gap: 8px;">
+                <span style="background: rgba(57, 255, 20, 0.15); color: #39FF14; border: 1px solid rgba(57,255,20,0.3); padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;">🌤️ 18°C 맑음</span>
+                <span style="background: rgba(255, 45, 120, 0.15); color: #FF2D78; border: 1px solid rgba(255,45,120,0.3); padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;">🍃 대기질 최고</span>
+            </div>
         </div>
     """, unsafe_allow_html=True)
     
     st.markdown("<div style='padding: 0 20px;'>", unsafe_allow_html=True)
     
-    m = folium.Map(location=[37.55, 127.04], zoom_start=14, tiles=None, zoom_control=False)
+    m = folium.Map(location=[37.553, 127.042], zoom_start=13.5, tiles=None, zoom_control=False)
     folium.TileLayer('CartoDB dark_matter', attr=' ').add_to(m)
     
     css_injection = """
@@ -375,10 +369,10 @@ if st.session_state.page == 'step1_location':
         marker.add_child(folium.Popup(popup_html))
         marker.add_to(m)
         
-    map_data = st_folium(m, height=450, use_container_width=True)
+    # 💡 핵심 수정 파트: returned_objects를 "last_clicked"로 묶어서 팝업 클릭 시 재실행되는 현상 방지
+    map_data = st_folium(m, height=450, use_container_width=True, returned_objects=["last_clicked"])
     st.markdown("</div>", unsafe_allow_html=True)
     
-    # 💡 이전처럼 지도를 터치하면 자동으로 두번째 창으로 넘어가도록 원복!
     if map_data and map_data.get('last_clicked'):
         lat, lon = map_data['last_clicked']['lat'], map_data['last_clicked']['lng']
         st.session_state.user_location = (lat, lon)
@@ -625,7 +619,6 @@ elif st.session_state.page == 'result':
         <div class="toggle-panel">
             <button id="btn-app" class="toggle-btn active" onclick="toggleLayer('app')">🚶‍♂️ 접근</button>
             <button id="btn-main" class="toggle-btn active" onclick="toggleLayer('main')">🏃 코스</button>
-            <!-- 💡 음수대 기본 상태 꺼짐(active 클래스 제거) -->
             <button id="btn-water" class="toggle-btn" onclick="toggleLayer('water')">💧 음수대</button>
         </div>
 
@@ -732,8 +725,6 @@ elif st.session_state.page == 'result':
 
         var appLayer = L.featureGroup().addTo(map);
         var mainLayer = L.featureGroup().addTo(map);
-        
-        // 💡 음수대 레이어 기본적으로 맵에 추가(addTo)하지 않음
         var waterLayer = L.featureGroup();
 
         var waterIcon = L.divIcon({
@@ -809,7 +800,6 @@ elif st.session_state.page == 'result':
         
         setTimeout(() => map.fitBounds(mainLayer.getBounds(), { paddingBottomRight: [0, 300], paddingTopLeft: [20, 50] }), 500);
 
-        // 💡 waterVis 초기값을 false로 설정
         var appVis = true, mainVis = true, waterVis = false;
         
         function toggleLayer(type) {
@@ -889,4 +879,3 @@ elif st.session_state.page == 'result':
     app_html = app_html.replace("___SHO_WELL_VAL___", str(sho_well_val))
 
     components.html(app_html, height=900, scrolling=False)
-
