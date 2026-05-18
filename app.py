@@ -31,7 +31,6 @@ st.markdown("""
         footer { display: none !important; }
         iframe { border: none !important; width: 100% !important; border-radius: 0 0 24px 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         
-        /* 💡 스트림릿 실행(로딩) 중 화면 어두워짐 및 깜빡임 원천 차단 */
         div[data-testid="stAppViewBlockContainer"] { opacity: 1 !important; transition: none !important; }
         div[data-testid="stAppViewContainer"] > div:first-child { background: transparent !important; }
         div[data-testid="stStatusWidget"] { display: none !important; }
@@ -326,7 +325,7 @@ if st.session_state.page == 'step1_location':
         <div style="margin: 5px 20px 20px 20px; background: linear-gradient(135deg, rgba(0,245,255,0.15) 0%, rgba(0,0,0,0) 100%); border: 1px solid rgba(0,245,255,0.2); border-radius: 20px; padding: 22px; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
             <div style="position: absolute; right: -15px; bottom: -20px; font-size: 110px; opacity: 0.1; transform: rotate(-15deg);">👟</div>
             <h2 style="margin: 0 0 8px 0; color: #FFF; font-size: 26px; font-weight: 900; letter-spacing: -1px;">Ready to Run?</h2>
-            <p style="margin: 0 0 16px 0; color: #8A8AA0; font-size: 13px; line-height: 1.4;">지도에서 <b>현재 위치</b>를 탭하여<br>최적의 웰니스 러닝 코스를 탐색하세요.<br>거점 마커를 누르면 상세정보가 뜹니다.</p>
+            <p style="margin: 0 0 16px 0; color: #8A8AA0; font-size: 13px; line-height: 1.4;">지도에서 <b>현재 위치</b>를 탭하여<br>최적의 웰니스 러닝 코스를 탐색하세요.<br>거점 마커에 커서를 올리면 이름이 뜹니다.</p>
             <div style="display: flex; gap: 8px;">
                 <span style="background: rgba(57, 255, 20, 0.15); color: #39FF14; border: 1px solid rgba(57,255,20,0.3); padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;">🌤️ 18°C 맑음</span>
                 <span style="background: rgba(255, 45, 120, 0.15); color: #FF2D78; border: 1px solid rgba(255,45,120,0.3); padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;">🍃 대기질 최고</span>
@@ -352,6 +351,11 @@ if st.session_state.page == 'step1_location':
         .leaflet-popup-content-wrapper { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
         .leaflet-popup-tip { display: none !important; }
         .leaflet-popup-content { margin: 0 !important; width: auto !important; }
+        .label-tooltip {
+            background: rgba(0,0,0,0.8) !important; border: 1px solid #FFF !important; box-shadow: none !important;
+            color: #FFFFFF !important; font-weight: 800 !important; font-size: 12px !important; border-radius: 8px !important;
+        }
+        .label-tooltip::before, .label-tooltip::after { display: none !important; }
     </style>
     """
     m.get_root().header.add_child(folium.Element(css_injection))
@@ -363,17 +367,9 @@ if st.session_state.page == 'step1_location':
         coords = info['coords']
         color = info['color']
         
-        popup_html = f"""
-        <div style="background: rgba(20,20,30,0.95); border: 1px solid {color}; padding: 12px; border-radius: 12px; color: #FFF; width: 170px; box-shadow: 0 4px 15px rgba(0,0,0,0.6);">
-            <div style="font-weight: 900; font-size: 15px; margin-bottom: 8px; text-align: center; color: {color};">{name}</div>
-            <img src="{get_base64_image(info['image'])}" style="width: 100%; height: 85px; object-fit: cover; border-radius: 6px; margin-bottom: 8px;">
-            <div style="font-size: 11px; color: #CCC; margin-bottom: 4px;"><b>유형:</b> {info['type']}</div>
-            <div style="font-size: 11px; color: #CCC; line-height: 1.4;"><b>시설:</b> {", ".join(info['facilities'])}</div>
-        </div>
-        """
-        
+        # 팝업 제거, 단순 툴팁 적용
         marker = folium.CircleMarker(location=coords, radius=7, color=color, fill=True, fillOpacity=0.9, weight=2)
-        marker.add_child(folium.Popup(popup_html))
+        marker.add_child(folium.Tooltip(name, className='label-tooltip'))
         marker.add_to(m)
         
     map_data = st_folium(m, height=450, use_container_width=True, returned_objects=["last_clicked"])
@@ -386,7 +382,101 @@ if st.session_state.page == 'step1_location':
         st.session_state.page = 'step2_course'
         st.rerun()
 
-# --- 이하는 기존 elif st.session_state.page == 'step2_course': 코드 유지 ---
+elif st.session_state.page == 'step2_course':
+    st.markdown("<h3>🎯 어디로 달려볼까요?</h3>", unsafe_allow_html=True)
+    
+    with st.expander("거점 정보 보기 🔍"):
+        for h in hub_names:
+            info = hubs_info[h]
+            img_base64 = get_base64_image(info['image'])
+            facs = " ".join([f"<span class='fac-badge'>• {f}</span>" for f in info['facilities']])
+            
+            st.markdown(f"""
+            <div style="background: #1E1E2E; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; margin-bottom: 12px; display: flex; gap: 12px;">
+                <img src="{img_base64}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px;">
+                <div style="flex: 1;">
+                    <div style="color: #FFF; font-size: 16px; font-weight: 900; margin-bottom: 4px;">{h}</div>
+                    <div style="font-size: 11px; font-weight: 800; margin-bottom: 8px; display: inline-block; padding: 3px 6px; border-radius: 4px; background: {info['bg']}; color: {info['color']};">{info['type']}</div>
+                    <div style="font-size: 11px; color: #CCC; line-height: 1.4;">{facs}</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    st.markdown("<hr style='border: 1px dashed rgba(255,255,255,0.1); margin: 10px 20px 20px 20px;'>", unsafe_allow_html=True)
+    
+    with st.container():
+        start_hub = st.selectbox("📍 출발 거점", hub_names, index=hub_names.index(st.session_state.nearest_hub))
+        mode = st.radio("🏃 코스 형태 선택", ["🚩 다른 거점으로 이동 (A to B)", "🔄 순환형 코스 (Loop)"])
+        
+        if mode == "🚩 다른 거점으로 이동 (A to B)":
+            via1 = st.selectbox("🔹 경유지 1 (선택)", ["선택 안 함"] + hub_names)
+            via2 = st.selectbox("🔹 경유지 2 (선택)", ["선택 안 함"] + hub_names)
+            end_drop = st.selectbox("🏁 도착 거점", [h for h in hub_names if h != start_hub])
+            
+            if st.button("경로 탐색 🚀", type="primary"):
+                with st.spinner("최적 경로 계산 중..."):
+                    seq = [start_hub]
+                    if via1 != "선택 안 함": seq.append(via1)
+                    if via2 != "선택 안 함": seq.append(via2)
+                    seq.append(end_drop)
+                    
+                    u_lat, u_lon = st.session_state.user_location
+                    user_node = get_nearest_node(u_lon, u_lat)
+                    first_hub_node = get_nearest_node(hubs_info[start_hub]['coords'][1], hubs_info[start_hub]['coords'][0])
+                    
+                    try: 
+                        p_app = nx.shortest_path(G, source=user_node, target=first_hub_node, weight='length')
+                        st.session_state.approach_segments = extract_real_geometry(p_app)
+                    except: st.session_state.approach_segments = []
+                    
+                    opt_segs, sho_segs = [], []
+                    
+                    opt_len_acc, sho_len_acc = 0, 0
+                    opt_well_acc, sho_well_acc = 0, 0
+                    opt_stats_acc = {c: 0.0 for c in criteria_cols}
+                    sho_stats_acc = {c: 0.0 for c in criteria_cols}
+                    
+                    for i in range(len(seq)-1):
+                        s_node = get_nearest_node(hubs_info[seq[i]]['coords'][1], hubs_info[seq[i]]['coords'][0])
+                        e_node = get_nearest_node(hubs_info[seq[i+1]]['coords'][1], hubs_info[seq[i+1]]['coords'][0])
+                        
+                        try: 
+                            p_o = get_pareto_optimal_path(G, s_node, e_node, min_ratio=1.0, max_ratio=1.5)
+                            opt_segs.extend(extract_real_geometry(p_o))
+                            l, s, w = get_stats_for_segment(p_o)
+                            opt_len_acc += l; opt_well_acc += w
+                            for c in criteria_cols: opt_stats_acc[c] += s[c]
+                        except: pass
+                        
+                        try: 
+                            p_s = nx.shortest_path(G, s_node, e_node, 'length')
+                            sho_segs.extend(extract_real_geometry(p_s))
+                            l, s, w = get_stats_for_segment(p_s)
+                            sho_len_acc += l; sho_well_acc += w
+                            for c in criteria_cols: sho_stats_acc[c] += s[c]
+                        except: pass
+                        
+                    st.session_state.main_opt_segments = opt_segs
+                    st.session_state.main_sho_segments = sho_segs
+                    
+                    st.session_state.dist_app = calc_real_physical_distance(st.session_state.approach_segments)
+                    st.session_state.dist_opt = calc_real_physical_distance(st.session_state.main_opt_segments)
+                    st.session_state.dist_sho = calc_real_physical_distance(st.session_state.main_sho_segments)
+                    st.session_state.route_mode = "A_TO_B"
+                    
+                    st.session_state.opt_stats = opt_stats_acc
+                    st.session_state.sho_stats = sho_stats_acc
+                    st.session_state.opt_len = opt_len_acc
+                    st.session_state.sho_len = sho_len_acc
+                    st.session_state.opt_well = opt_well_acc
+                    st.session_state.sho_well = sho_well_acc
+                    
+                    markers = [{"name": "현 위치", "lat": u_lat, "lon": u_lon, "color": "#FF9500"}]
+                    for h in set(seq): markers.append({"name": h, "lat": hubs_info[h]['coords'][0], "lon": hubs_info[h]['coords'][1], "color": hubs_info[h]['color']})
+                    st.session_state.marker_data = markers
+                    
+                    st.session_state.page = 'result'
+                    st.rerun()
                     
         elif mode == "🔄 순환형 코스 (Loop)":
             if df_loop_merged.empty:
@@ -476,16 +566,6 @@ elif st.session_state.page == 'result':
                 white-space: nowrap !important; text-align: center !important; pointer-events: none;
             }
             .label-tooltip::before, .label-tooltip::after { display: none !important; }
-
-            .custom-water-icon { 
-                display: flex !important; 
-                justify-content: center !important; 
-                align-items: center !important;
-                font-size: 10px !important;
-                background: none !important;
-                border: none !important;
-                box-shadow: none !important;
-            }
 
             .bottom-sheet { 
                 position: absolute; bottom: 0; left: 0; width: 100%; 
@@ -639,15 +719,14 @@ elif st.session_state.page == 'result':
         var mainLayer = L.featureGroup().addTo(map);
         var waterLayer = L.featureGroup();
 
-        var waterIcon = L.divIcon({
-            html: '💧',
-            className: 'custom-water-icon',
-            iconSize: [12, 12],
-            iconAnchor: [6, 6]
-        });
-
         fountainsData.forEach(f => {
-            L.marker([f.lat, f.lon], { icon: waterIcon, interactive: false }).addTo(waterLayer);
+            L.circleMarker([f.lat, f.lon], { 
+                radius: 2, 
+                color: '#00BFFF', 
+                fill: true, 
+                fillOpacity: 0.9,
+                weight: 1 
+            }).addTo(waterLayer);
         });
 
         markers.forEach(m => {
