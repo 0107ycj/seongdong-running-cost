@@ -675,7 +675,7 @@ elif st.session_state.page == 'result':
         var waterIcon = L.divIcon({
             html: '<div style="font-size: 16px; text-shadow: 0 0 5px rgba(0, 245, 255, 0.8);">💧</div>',
             className: 'custom-water-icon',
-            iconSize: [20, 20],
+            iconSize: [10, 10],
             iconAnchor: [10, 10]
         });
 
