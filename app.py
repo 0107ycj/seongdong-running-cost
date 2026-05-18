@@ -383,7 +383,8 @@ if st.session_state.page == 'step1_location':
 elif st.session_state.page == 'step2_course':
     st.markdown("<h3>🎯 어디로 달려볼까요?</h3>", unsafe_allow_html=True)
     
-    with st.expander("거점 정보 보기 🔍"):
+    # 💡 거점 정보 아코디언 (도착지 고르기 전 참고용)
+    with st.expander("📊 거점 시설 정보 모두 보기"):
         for h in hub_names:
             info = hubs_info[h]
             img_base64 = get_base64_image(info['image'])
@@ -407,11 +408,14 @@ elif st.session_state.page == 'step2_course':
         mode = st.radio("🏃 코스 형태 선택", ["🚩 다른 거점으로 이동 (A to B)", "🔄 순환형 코스 (Loop)"])
         
         if mode == "🚩 다른 거점으로 이동 (A to B)":
-            end_drop = st.selectbox("🏁 도착 거점", [h for h in hub_names if h != start_hub])
+            # 💡 [순서 변경] 경유지를 먼저 선택하게 함
             via1 = st.selectbox("🔹 경유지 1 (선택)", ["선택 안 함"] + hub_names)
             via2 = st.selectbox("🔹 경유지 2 (선택)", ["선택 안 함"] + hub_names)
+            # 도착 거점을 맨 아래로 배치
+            end_drop = st.selectbox("🏁 도착 거점", [h for h in hub_names if h != start_hub])
             
             if st.button("경로 탐색 🚀", type="primary"):
+                # ... (경로 탐색 계산 로직은 동일) ...
                 with st.spinner("최적 경로 계산 중..."):
                     seq = [start_hub]
                     if via1 != "선택 안 함": seq.append(via1)
@@ -428,7 +432,6 @@ elif st.session_state.page == 'step2_course':
                     except: st.session_state.approach_segments = []
                     
                     opt_segs, sho_segs = [], []
-                    
                     opt_len_acc, sho_len_acc = 0, 0
                     opt_well_acc, sho_well_acc = 0, 0
                     opt_stats_acc = {c: 0.0 for c in criteria_cols}
@@ -437,7 +440,6 @@ elif st.session_state.page == 'step2_course':
                     for i in range(len(seq)-1):
                         s_node = get_nearest_node(hubs_info[seq[i]]['coords'][1], hubs_info[seq[i]]['coords'][0])
                         e_node = get_nearest_node(hubs_info[seq[i+1]]['coords'][1], hubs_info[seq[i+1]]['coords'][0])
-                        
                         try: 
                             p_o = get_pareto_optimal_path(G, s_node, e_node, min_ratio=1.0, max_ratio=1.5)
                             opt_segs.extend(extract_real_geometry(p_o))
@@ -445,7 +447,6 @@ elif st.session_state.page == 'step2_course':
                             opt_len_acc += l; opt_well_acc += w
                             for c in criteria_cols: opt_stats_acc[c] += s[c]
                         except: pass
-                        
                         try: 
                             p_s = nx.shortest_path(G, s_node, e_node, 'length')
                             sho_segs.extend(extract_real_geometry(p_s))
@@ -456,12 +457,10 @@ elif st.session_state.page == 'step2_course':
                         
                     st.session_state.main_opt_segments = opt_segs
                     st.session_state.main_sho_segments = sho_segs
-                    
                     st.session_state.dist_app = calc_real_physical_distance(st.session_state.approach_segments)
                     st.session_state.dist_opt = calc_real_physical_distance(st.session_state.main_opt_segments)
                     st.session_state.dist_sho = calc_real_physical_distance(st.session_state.main_sho_segments)
                     st.session_state.route_mode = "A_TO_B"
-                    
                     st.session_state.opt_stats = opt_stats_acc
                     st.session_state.sho_stats = sho_stats_acc
                     st.session_state.opt_len = opt_len_acc
@@ -472,7 +471,6 @@ elif st.session_state.page == 'step2_course':
                     markers = [{"name": "현 위치", "lat": u_lat, "lon": u_lon, "color": "#FF9500"}]
                     for h in set(seq): markers.append({"name": h, "lat": hubs_info[h]['coords'][0], "lon": hubs_info[h]['coords'][1], "color": hubs_info[h]['color']})
                     st.session_state.marker_data = markers
-                    
                     st.session_state.page = 'result'
                     st.rerun()
                     
