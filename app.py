@@ -879,4 +879,3 @@ elif st.session_state.page == 'result':
     app_html = app_html.replace("___SHO_WELL_VAL___", str(sho_well_val))
 
     components.html(app_html, height=900, scrolling=False)
-
