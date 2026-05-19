@@ -323,13 +323,13 @@ if st.session_state.page == 'step1_location':
             </div>
         </div>
         
-        <div style="margin: 5px 20px 20px 20px; background: linear-gradient(135deg, rgba(0,245,255,0.15) 0%, rgba(0,0,0,0) 100%); border: 1px solid rgba(0,245,255,0.2); border-radius: 20px; padding: 22px; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
+        <div style="margin: 5px 20px 10px 20px; background: linear-gradient(135deg, rgba(0,245,255,0.15) 0%, rgba(0,0,0,0) 100%); border: 1px solid rgba(0,245,255,0.2); border-radius: 20px; padding: 18px; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
             <div style="position: absolute; right: -15px; bottom: -20px; font-size: 110px; opacity: 0.1; transform: rotate(-15deg);">👟</div>
-            <h2 style="margin: 0 0 8px 0; color: #FFF; font-size: 26px; font-weight: 900; letter-spacing: -1px;">Ready to Run?</h2>
-            <p style="margin: 0 0 16px 0; color: #8A8AA0; font-size: 13px; line-height: 1.4;">지도에서 <b>현재 위치</b>를 탭하여<br>최적의 웰니스 러닝 코스를 탐색하세요.<br>거점 마커를 누르면 상세정보가 뜹니다.</p>
+            <h2 style="margin: 0 0 8px 0; color: #FFF; font-size: 24px; font-weight: 900; letter-spacing: -1px;">Ready to Run?</h2>
+            <p style="margin: 0 0 12px 0; color: #8A8AA0; font-size: 12px; line-height: 1.4;">지도에서 <b>현재 위치</b>를 탭하여 웰니스 코스를 탐색하세요.<br>거점 마커를 누르면 상세정보가 뜹니다.</p>
             <div style="display: flex; gap: 8px;">
-                <span style="background: rgba(57, 255, 20, 0.15); color: #39FF14; border: 1px solid rgba(57,255,20,0.3); padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;">🌤️ 18°C 맑음</span>
-                <span style="background: rgba(255, 45, 120, 0.15); color: #FF2D78; border: 1px solid rgba(255,45,120,0.3); padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;">🍃 대기질 최고</span>
+                <span style="background: rgba(57, 255, 20, 0.15); color: #39FF14; border: 1px solid rgba(57,255,20,0.3); padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;">🚇 초록색: 교통 요충지형</span>
+                <span style="background: rgba(0, 245, 255, 0.15); color: #00F5FF; border: 1px solid rgba(0,245,255,0.3); padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;">🌊 파란색: 수변 관문형</span>
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -369,8 +369,8 @@ if st.session_state.page == 'step1_location':
         marker.add_child(folium.Popup(popup_html))
         marker.add_to(m)
         
-    # 💡 핵심 수정 파트: returned_objects를 "last_clicked"로 묶어서 팝업 클릭 시 재실행되는 현상 방지
-    map_data = st_folium(m, height=450, use_container_width=True, returned_objects=["last_clicked"])
+    # 💡 지도 높이를 450에서 400으로 줄여서 세로 밀림 방지
+    map_data = st_folium(m, height=400, use_container_width=True, returned_objects=["last_clicked"])
     st.markdown("</div>", unsafe_allow_html=True)
     
     if map_data and map_data.get('last_clicked'):
