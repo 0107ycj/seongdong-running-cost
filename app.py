@@ -305,9 +305,7 @@ def get_pareto_optimal_path(G, source, target, min_ratio=1.0, max_ratio=1.5):
         return shortest_path
     except: return []
 
-# --- (상단 코드 동일) ---
-
-# --- 4. 화면 제어 (Step 1_location) ---
+# --- 4. 화면 제어 ---
 
 if st.session_state.page == 'step1_location':
     
@@ -320,18 +318,26 @@ if st.session_state.page == 'step1_location':
                     <div style="font-size: 18px; color: #FFF; font-weight: 900; letter-spacing: -0.5px;">Runner 🏃‍♂️</div>
                 </div>
             </div>
+            <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            </div>
         </div>
         
-        <div style="margin: 5px 20px 15px 20px; background: linear-gradient(135deg, rgba(0,245,255,0.15) 0%, rgba(0,0,0,0) 100%); border: 1px solid rgba(0,245,255,0.2); border-radius: 20px; padding: 22px;">
-            <h2 style="margin: 0 0 8px 0; color: #FFF; font-size: 26px; font-weight: 900;">Ready to Run?</h2>
-            <p style="color: #8A8AA0; font-size: 13px;">지도에서 출발할 지점을 탭하세요.</p>
+        <div style="margin: 5px 20px 15px 20px; background: linear-gradient(135deg, rgba(0,245,255,0.15) 0%, rgba(0,0,0,0) 100%); border: 1px solid rgba(0,245,255,0.2); border-radius: 20px; padding: 22px; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
+            <div style="position: absolute; right: -15px; bottom: -20px; font-size: 110px; opacity: 0.1; transform: rotate(-15deg);">👟</div>
+            <h2 style="margin: 0 0 8px 0; color: #FFF; font-size: 26px; font-weight: 900; letter-spacing: -1px;">Ready to Run?</h2>
+            <p style="margin: 0 0 16px 0; color: #8A8AA0; font-size: 13px; line-height: 1.4;">지도에서 <b>현재 위치</b>를 탭하여<br>최적의 웰니스 러닝 코스를 탐색하세요.<br>거점 마커를 누르면 상세정보가 뜹니다.</p>
+            <div style="display: flex; gap: 8px;">
+                <span style="background: rgba(57, 255, 20, 0.15); color: #39FF14; border: 1px solid rgba(57,255,20,0.3); padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;">🌤️ 18°C 맑음</span>
+                <span style="background: rgba(255, 45, 120, 0.15); color: #FF2D78; border: 1px solid rgba(255,45,120,0.3); padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;">🍃 대기질 최고</span>
+            </div>
         </div>
         
-        <div style="margin: 0 20px 15px 20px; display: flex; flex-wrap: nowrap; gap: 4px; justify-content: space-between;">
-            <div style="background: rgba(57,255,20,0.15); border: 1px solid #39FF14; color: #39FF14; padding: 4px 2px; border-radius: 8px; font-size: 9px; font-weight: 800; text-align:center; flex:1;">🟢 교통</div>
-            <div style="background: rgba(0,245,255,0.15); border: 1px solid #00F5FF; color: #00F5FF; padding: 4px 2px; border-radius: 8px; font-size: 9px; font-weight: 800; text-align:center; flex:1;">🔵 수변</div>
-            <div style="background: rgba(255,45,120,0.15); border: 1px solid #FF2D78; color: #FF2D78; padding: 4px 2px; border-radius: 8px; font-size: 9px; font-weight: 800; text-align:center; flex:1;">🔴 상권</div>
-            <div style="background: rgba(255,215,0,0.15); border: 1px solid #FFD700; color: #FFD700; padding: 4px 2px; border-radius: 8px; font-size: 9px; font-weight: 800; text-align:center; flex:1;">🟡 주거</div>
+        <div style="margin: 0 20px 15px 20px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;">
+            <div style="background: rgba(57,255,20,0.15); border: 1px solid #39FF14; color: #39FF14; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 800;">🟢 교통 요충지형</div>
+            <div style="background: rgba(0,245,255,0.15); border: 1px solid #00F5FF; color: #00F5FF; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 800;">🔵 수변 관문형</div>
+            <div style="background: rgba(255,45,120,0.15); border: 1px solid #FF2D78; color: #FF2D78; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 800;">🔴 상권/트렌드형</div>
+            <div style="background: rgba(255,215,0,0.15); border: 1px solid #FFD700; color: #FFD700; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 800;">🟡 주거 밀착형</div>
         </div>
     """, unsafe_allow_html=True)
     
@@ -340,24 +346,44 @@ if st.session_state.page == 'step1_location':
     m = folium.Map(location=[37.553, 127.042], zoom_start=13.5, tiles=None, zoom_control=False)
     folium.TileLayer('CartoDB dark_matter', attr=' ').add_to(m)
     
-    # 💡 거점 마커 표시
+    css_injection = """
+    <style>
+        .leaflet-control-attribution { display: none !important; visibility: hidden !important; }
+        .leaflet-popup-content-wrapper { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
+        .leaflet-popup-tip { display: none !important; }
+        .leaflet-popup-content { margin: 0 !important; width: auto !important; }
+    </style>
+    """
+    m.get_root().header.add_child(folium.Element(css_injection))
+    
+    if sd_boundary:
+        folium.GeoJson(sd_boundary, style_function=lambda x: {'color': 'white', 'fillColor': 'transparent', 'weight': 2, 'opacity': 0.6, 'dashArray':'5,5'}).add_to(m)
+
     for name, info in hubs_info.items():
-        folium.CircleMarker(
-            location=info['coords'], radius=7, color=info['color'], fill=True, fillOpacity=0.9, weight=2
-        ).add_child(folium.Popup(f"<div style='font-weight:900;'>{name}</div>")).add_to(m)
-    
-    # 💡 클릭한 곳 현 위치 마커 표시
-    if st.session_state.user_location:
-        folium.Marker(
-            location=st.session_state.user_location,
-            icon=folium.Icon(color='blue', icon='info-sign')
-        ).add_to(m)
-    
+        coords = info['coords']
+        color = info['color']
+        
+        popup_html = f"""
+        <div style="background: rgba(20,20,30,0.95); border: 1px solid {color}; padding: 12px; border-radius: 12px; color: #FFF; width: 170px; box-shadow: 0 4px 15px rgba(0,0,0,0.6);">
+            <div style="font-weight: 900; font-size: 15px; margin-bottom: 8px; text-align: center; color: {color};">{name}</div>
+            <img src="{get_base64_image(info['image'])}" style="width: 100%; height: 85px; object-fit: cover; border-radius: 6px; margin-bottom: 8px;">
+            <div style="font-size: 11px; color: #CCC; margin-bottom: 4px;"><b>유형:</b> {info['type']}</div>
+            <div style="font-size: 11px; color: #CCC; line-height: 1.4;"><b>시설:</b> {", ".join(info['facilities'])}</div>
+        </div>
+        """
+        
+        marker = folium.CircleMarker(location=coords, radius=7, color=color, fill=True, fillOpacity=0.9, weight=2)
+        marker.add_child(folium.Popup(popup_html))
+        marker.add_to(m)
+        
     map_data = st_folium(m, height=450, use_container_width=True, returned_objects=["last_clicked"])
     st.markdown("</div>", unsafe_allow_html=True)
     
+    # 💡 [핵심 수정 파트] 지도를 클릭했을 때 자동으로 다음 페이지로 넘어가는 것을 막음.
     if map_data and map_data.get('last_clicked'):
         lat, lon = map_data['last_clicked']['lat'], map_data['last_clicked']['lng']
+        
+        # 소수점 4자리까지 비교하여 같은 마커를 두 번 누를 때 새로고침(리런)되는 현상 방지
         current_click = (round(lat, 4), round(lon, 4))
         saved_click = (round(st.session_state.user_location[0], 4), round(st.session_state.user_location[1], 4)) if st.session_state.user_location else None
         
@@ -366,12 +392,12 @@ if st.session_state.page == 'step1_location':
             st.session_state.nearest_hub = get_nearest_hub(lat, lon)
             st.rerun()
 
+    # 💡 팝업을 편하게 본 다음, 유저가 원할 때 "다음" 버튼을 눌러야만 페이지가 넘어가도록 변경.
     if st.session_state.user_location:
-        st.markdown("<div style='text-align:center; color:#39FF14; font-weight:bold; padding:10px;'>📍 위치 등록 완료!</div>", unsafe_allow_html=True)
-        if st.button("다음 단계로 가기 🚀", type="primary"):
+        st.markdown("<div style='text-align:center; color:#39FF14; font-weight:bold; padding:15px 0 5px 0;'>📍 출발 위치가 맵에 등록되었습니다!</div>", unsafe_allow_html=True)
+        if st.button("다음 : 코스 및 설정하기 🚀", type="primary"):
             st.session_state.page = 'step2_course'
             st.rerun()
-# --- (이하 나머지 코드는 동일) ---
 
 elif st.session_state.page == 'step2_course':
     st.markdown("<h3>🎯 어디로 달려볼까요?</h3>", unsafe_allow_html=True)
