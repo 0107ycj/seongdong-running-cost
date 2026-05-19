@@ -31,7 +31,6 @@ st.markdown("""
         footer { display: none !important; }
         iframe { border: none !important; width: 100% !important; border-radius: 0 0 24px 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         
-        /* 💡 스트림릿 실행(로딩) 중 화면 어두워짐 및 깜빡임 원천 차단 */
         div[data-testid="stAppViewBlockContainer"] { opacity: 1 !important; transition: none !important; }
         div[data-testid="stAppViewContainer"] > div:first-child { background: transparent !important; }
         div[data-testid="stStatusWidget"] { display: none !important; }
@@ -101,7 +100,7 @@ hubs_info = {
     "청구아파트나들목": {"coords": (37.5348428, 127.0552105), "type": "수변 관문형", "icon": "🌊", "color": "#00F5FF", "bg": "rgba(0,245,255,0.15)", "image": "gu.jpg", "facilities": ["음수대", "물품보관함", "야간 조명", "쿨링 미스트"]},
     "송정체육공원": {"coords": (37.5536442, 127.0672346), "type": "수변 관문형", "icon": "🌉", "color": "#00F5FF", "bg": "rgba(0,245,255,0.15)", "image": "song.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함"]},
     "서울숲역": {"coords": (37.5465240, 127.0429873), "type": "상권 / 트렌드형", "icon": "🛍️", "color": "#FF2D78", "bg": "rgba(255,45,120,0.15)", "image": "forest.jpg", "facilities": ["파클릿", "음수대", "물품보관함"]},
-    "성삼공원": {"coords": (37.5420202, 127.0602789), "type": "상권 / 트렌드형", "icon": "☕", "color": "#FF2D78", "bg": "rgba(255,45,120,0.15)", "image": "sam.jpg", "facilities": ["파클릿", "음수대", "물품보관함"]},
+    "성삼공원": {"coords": (37.5420202, 127.0602789), "type": "상권 / 트렌드형", "icon": "☕", "color": "#FF2D78", "bg": "rgba(255,45,120,0.15)", "image": "sam.jpg", "facilities": ["파클릿", "음수대", "물품보관함", "휴식 라운지"]},
     "금옥공원": {"coords": (37.5534649, 127.0213021), "type": "주거 밀착형", "icon": "🏘️", "color": "#FFD700", "bg": "rgba(255,215,0,0.15)", "image": "gold.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함", "휴식 라운지"]},
     "꽃재공원": {"coords": (37.5672965, 127.0282145), "type": "주거 밀착형", "icon": "🏡", "color": "#FFD700", "bg": "rgba(255,215,0,0.15)", "image": "flower.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함"]},
     "용답마을마당": {"coords": (37.5619688, 127.0517828), "type": "주거 밀착형", "icon": "🏘️", "color": "#FFD700", "bg": "rgba(255,215,0,0.15)", "image": "yong.jpg", "facilities": ["스트레칭존", "음수대", "물품보관함", "휴식 라운지"]},
@@ -323,26 +322,24 @@ if st.session_state.page == 'step1_location':
             </div>
         </div>
         
-        <div style="margin: 5px 20px 15px 20px; background: linear-gradient(135deg, rgba(0,245,255,0.15) 0%, rgba(0,0,0,0) 100%); border: 1px solid rgba(0,245,255,0.2); border-radius: 20px; padding: 22px; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
+        <div style="margin: 5px 20px 20px 20px; background: linear-gradient(135deg, rgba(0,245,255,0.15) 0%, rgba(0,0,0,0) 100%); border: 1px solid rgba(0,245,255,0.2); border-radius: 20px; padding: 22px; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
             <div style="position: absolute; right: -15px; bottom: -20px; font-size: 110px; opacity: 0.1; transform: rotate(-15deg);">👟</div>
             <h2 style="margin: 0 0 8px 0; color: #FFF; font-size: 26px; font-weight: 900; letter-spacing: -1px;">Ready to Run?</h2>
-            <p style="margin: 0 0 16px 0; color: #8A8AA0; font-size: 13px; line-height: 1.4;">지도에서 <b>현재 위치</b>를 탭하여<br>최적의 웰니스 러닝 코스를 탐색하세요.<br>거점 마커를 누르면 상세정보가 뜹니다.</p>
+            <p style="margin: 0 0 16px 0; color: #8A8AA0; font-size: 13px; line-height: 1.4;">지도에서 <b>현재 위치</b>를 탭하여<br>최적의 웰니스 러닝 코스를 탐색하세요.<br>거점 마커에 커서를 올리면 이름이 뜹니다.</p>
             <div style="display: flex; gap: 8px;">
                 <span style="background: rgba(57, 255, 20, 0.15); color: #39FF14; border: 1px solid rgba(57,255,20,0.3); padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;">🌤️ 18°C 맑음</span>
                 <span style="background: rgba(255, 45, 120, 0.15); color: #FF2D78; border: 1px solid rgba(255,45,120,0.3); padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;">🍃 대기질 최고</span>
             </div>
         </div>
         
-        <div style="margin: 0 20px 15px 20px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;">
-            <div style="background: rgba(57,255,20,0.15); border: 1px solid #39FF14; color: #39FF14; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 800;">🟢 교통 요충지형</div>
-            <div style="background: rgba(0,245,255,0.15); border: 1px solid #00F5FF; color: #00F5FF; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 800;">🔵 수변 관문형</div>
-            <div style="background: rgba(255,45,120,0.15); border: 1px solid #FF2D78; color: #FF2D78; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 800;">🔴 상권/트렌드형</div>
-            <div style="background: rgba(255,215,0,0.15); border: 1px solid #FFD700; color: #FFD700; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 800;">🟡 주거 밀착형</div>
+        <div style="margin: 0 20px 10px 20px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;">
+            <div style="background: rgba(57,255,20,0.15); border: 1px solid #39FF14; color: #39FF14; padding: 4px 8px; border-radius: 12px; font-size: 10px; font-weight: 800;">🟢 교통 요충지형</div>
+            <div style="background: rgba(0,245,255,0.15); border: 1px solid #00F5FF; color: #00F5FF; padding: 4px 8px; border-radius: 12px; font-size: 10px; font-weight: 800;">🔵 수변 관문형</div>
+            <div style="background: rgba(255,45,120,0.15); border: 1px solid #FF2D78; color: #FF2D78; padding: 4px 8px; border-radius: 12px; font-size: 10px; font-weight: 800;">🔴 상권/트렌드형</div>
+            <div style="background: rgba(255,215,0,0.15); border: 1px solid #FFD700; color: #FFD700; padding: 4px 8px; border-radius: 12px; font-size: 10px; font-weight: 800;">🟡 주거 밀착형</div>
         </div>
     """, unsafe_allow_html=True)
     
-# --- (중략: 코드 상단부 생략) ---
-
     st.markdown("<div style='padding: 0 20px;'>", unsafe_allow_html=True)
     
     m = folium.Map(location=[37.553, 127.042], zoom_start=13.5, tiles=None, zoom_control=False)
@@ -351,76 +348,39 @@ if st.session_state.page == 'step1_location':
     css_injection = """
     <style>
         .leaflet-control-attribution { display: none !important; visibility: hidden !important; }
-        .leaflet-popup-content-wrapper { background: rgba(20,20,30,0.95) !important; border: 1px solid #00F5FF !important; border-radius: 12px !important; }
+        .leaflet-popup-content-wrapper { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
         .leaflet-popup-tip { display: none !important; }
-        .leaflet-popup-content { margin: 0 !important; width: 170px !important; }
+        .leaflet-popup-content { margin: 0 !important; width: auto !important; }
+        .label-tooltip {
+            background: rgba(0,0,0,0.8) !important; border: 1px solid #FFF !important; box-shadow: none !important;
+            color: #FFFFFF !important; font-weight: 800 !important; font-size: 12px !important; border-radius: 8px !important;
+        }
+        .label-tooltip::before, .label-tooltip::after { display: none !important; }
     </style>
     """
     m.get_root().header.add_child(folium.Element(css_injection))
     
-    # 💡 [복구 완료] 성동구 경계선 추가
     if sd_boundary:
-        folium.GeoJson(
-            sd_boundary, 
-            style_function=lambda x: {
-                'color': 'white', 
-                'fillColor': 'transparent', 
-                'weight': 2, 
-                'opacity': 0.6, 
-                'dashArray':'5,5'
-            }
-        ).add_to(m)
+        folium.GeoJson(sd_boundary, style_function=lambda x: {'color': 'white', 'fillColor': 'transparent', 'weight': 2, 'opacity': 0.6, 'dashArray':'5,5'}).add_to(m)
 
-    # 💡 거점 마커 표시
     for name, info in hubs_info.items():
-        popup_html = f"""
-        <div style="padding:10px; color:white;">
-            <div style="font-weight:900; font-size:15px; margin-bottom:8px; color:{info['color']};">{name}</div>
-            <img src="{get_base64_image(info['image'])}" style="width:100%; height:80px; object-fit:cover; border-radius:8px; margin-bottom:5px;">
-            <div style="font-size:11px; margin-bottom:3px;"><b>유형:</b> {info['type']}</div>
-            <div style="font-size:11px;"><b>시설:</b> {", ".join(info['facilities'])}</div>
-        </div>
-        """
-        folium.CircleMarker(
-            location=info['coords'], radius=7, color=info['color'], fill=True, fillOpacity=0.9, weight=2
-        ).add_child(folium.Popup(popup_html)).add_to(m)
-    
-# --- (중략: 상단부는 그대로 유지) ---
-
-    # 💡 [핵심] 현 위치 마커를 CircleMarker로 변경하여 오차 방지
-    if st.session_state.user_location:
-        folium.CircleMarker(
-            location=st.session_state.user_location,
-            radius=8,
-            color="#FF9500",
-            fill=True,
-            fillColor="#FF9500",
-            fillOpacity=1,
-            weight=2
-        ).add_to(m)
-    
-    # 💡 map_data 처리 로직 개선
+        coords = info['coords']
+        color = info['color']
+        
+        # 팝업 제거, 단순 툴팁 적용
+        marker = folium.CircleMarker(location=coords, radius=7, color=color, fill=True, fillOpacity=0.9, weight=2)
+        marker.add_child(folium.Tooltip(name, className='label-tooltip'))
+        marker.add_to(m)
+        
     map_data = st_folium(m, height=450, use_container_width=True, returned_objects=["last_clicked"])
     st.markdown("</div>", unsafe_allow_html=True)
     
     if map_data and map_data.get('last_clicked'):
-        lat = map_data['last_clicked']['lat']
-        lon = map_data['last_clicked']['lng']
-        
-        # 💡 오차 방지: 값이 너무 미세하게 변하는 경우 새로고침 방지
-        if abs(lat - (st.session_state.user_location[0] if st.session_state.user_location else 0)) > 0.0001:
-            st.session_state.user_location = (lat, lon)
-            st.session_state.nearest_hub = get_nearest_hub(lat, lon)
-            st.rerun()
-
-# --- (이하 나머지 코드는 동일) ---
-
-    # 💡 팝업을 편하게 본 다음, 유저가 원할 때 "다음" 버튼을 눌러야만 페이지가 넘어가도록 변경.
-    if st.session_state.user_location:
-        st.markdown("<div style='text-align:center; color:#39FF14; font-weight:bold; padding:15px 0 5px 0;'>📍 출발 위치가 맵에 등록되었습니다!</div>", unsafe_allow_html=True)
-        if st.button("다음 : 코스 및 설정하기 🚀", type="primary"):
-            st.session_state.page = 'step2_course'
-            st.rerun()
+        lat, lon = map_data['last_clicked']['lat'], map_data['last_clicked']['lng']
+        st.session_state.user_location = (lat, lon)
+        st.session_state.nearest_hub = get_nearest_hub(lat, lon)
+        st.session_state.page = 'step2_course'
+        st.rerun()
 
 elif st.session_state.page == 'step2_course':
     st.markdown("<h3>🎯 어디로 달려볼까요?</h3>", unsafe_allow_html=True)
@@ -606,16 +566,6 @@ elif st.session_state.page == 'result':
                 white-space: nowrap !important; text-align: center !important; pointer-events: none;
             }
             .label-tooltip::before, .label-tooltip::after { display: none !important; }
-
-            .custom-water-icon { 
-                display: flex !important; 
-                justify-content: center !important; 
-                align-items: center !important;
-                font-size: 10px !important;
-                background: none !important;
-                border: none !important;
-                box-shadow: none !important;
-            }
 
             .bottom-sheet { 
                 position: absolute; bottom: 0; left: 0; width: 100%; 
