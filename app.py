@@ -327,11 +327,16 @@ if st.session_state.page == 'step1_location':
             <div style="position: absolute; right: -15px; bottom: -20px; font-size: 110px; opacity: 0.1; transform: rotate(-15deg);">👟</div>
             <h2 style="margin: 0 0 8px 0; color: #FFF; font-size: 24px; font-weight: 900; letter-spacing: -1px;">Ready to Run?</h2>
             <p style="margin: 0 0 12px 0; color: #8A8AA0; font-size: 12px; line-height: 1.4;">지도에서 <b>현재 위치</b>를 탭하여 웰니스 코스를 탐색하세요.<br>거점 마커를 누르면 상세정보가 뜹니다.</p>
-            <div style="display: flex; gap: 8px;">
-                <span style="background: rgba(57, 255, 20, 0.15); color: #39FF14; border: 1px solid rgba(57,255,20,0.3); padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;">🚇 초록색: 교통 요충지형</span>
-                <span style="background: rgba(0, 245, 255, 0.15); color: #00F5FF; border: 1px solid rgba(0,245,255,0.3); padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;">🌊 파란색: 수변 관문형</span>
+            
+            <!-- 👇 이 부분이 4가지 색상 점 범례로 수정된 부분입니다 👇 -->
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                <span style="background: rgba(57, 255, 20, 0.15); color: #39FF14; border: 1px solid rgba(57,255,20,0.3); padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 800;">🟢 교통 요충지형</span>
+                <span style="background: rgba(0, 245, 255, 0.15); color: #00F5FF; border: 1px solid rgba(0,245,255,0.3); padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 800;">🔵 수변 관문형</span>
+                <span style="background: rgba(255, 215, 0, 0.15); color: #FFD700; border: 1px solid rgba(255,215,0,0.3); padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 800;">🟡 주거 밀착형</span>
+                <span style="background: rgba(255, 45, 120, 0.15); color: #FF2D78; border: 1px solid rgba(255,45,120,0.3); padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 800;">🔴 상권 결합형</span>
             </div>
         </div>
+
     """, unsafe_allow_html=True)
     
     st.markdown("<div style='padding: 0 20px;'>", unsafe_allow_html=True)
