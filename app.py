@@ -323,7 +323,7 @@ if st.session_state.page == 'step1_location':
             </div>
         </div>
         
-        <div style="margin: 5px 20px 20px 20px; background: linear-gradient(135deg, rgba(0,245,255,0.15) 0%, rgba(0,0,0,0) 100%); border: 1px solid rgba(0,245,255,0.2); border-radius: 20px; padding: 22px; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
+        <div style="margin: 5px 20px 15px 20px; background: linear-gradient(135deg, rgba(0,245,255,0.15) 0%, rgba(0,0,0,0) 100%); border: 1px solid rgba(0,245,255,0.2); border-radius: 20px; padding: 22px; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
             <div style="position: absolute; right: -15px; bottom: -20px; font-size: 110px; opacity: 0.1; transform: rotate(-15deg);">👟</div>
             <h2 style="margin: 0 0 8px 0; color: #FFF; font-size: 26px; font-weight: 900; letter-spacing: -1px;">Ready to Run?</h2>
             <p style="margin: 0 0 16px 0; color: #8A8AA0; font-size: 13px; line-height: 1.4;">지도에서 <b>현재 위치</b>를 탭하여<br>최적의 웰니스 러닝 코스를 탐색하세요.<br>거점 마커를 누르면 상세정보가 뜹니다.</p>
@@ -331,6 +331,13 @@ if st.session_state.page == 'step1_location':
                 <span style="background: rgba(57, 255, 20, 0.15); color: #39FF14; border: 1px solid rgba(57,255,20,0.3); padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;">🌤️ 18°C 맑음</span>
                 <span style="background: rgba(255, 45, 120, 0.15); color: #FF2D78; border: 1px solid rgba(255,45,120,0.3); padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;">🍃 대기질 최고</span>
             </div>
+        </div>
+        
+        <div style="margin: 0 20px 15px 20px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;">
+            <div style="background: rgba(57,255,20,0.15); border: 1px solid #39FF14; color: #39FF14; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 800;">🟢 교통 요충지형</div>
+            <div style="background: rgba(0,245,255,0.15); border: 1px solid #00F5FF; color: #00F5FF; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 800;">🔵 수변 관문형</div>
+            <div style="background: rgba(255,45,120,0.15); border: 1px solid #FF2D78; color: #FF2D78; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 800;">🔴 상권/트렌드형</div>
+            <div style="background: rgba(255,215,0,0.15); border: 1px solid #FFD700; color: #FFD700; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 800;">🟡 주거 밀착형</div>
         </div>
     """, unsafe_allow_html=True)
     
@@ -369,16 +376,28 @@ if st.session_state.page == 'step1_location':
         marker.add_child(folium.Popup(popup_html))
         marker.add_to(m)
         
-    # 💡 핵심 수정 파트: returned_objects를 "last_clicked"로 묶어서 팝업 클릭 시 재실행되는 현상 방지
     map_data = st_folium(m, height=450, use_container_width=True, returned_objects=["last_clicked"])
     st.markdown("</div>", unsafe_allow_html=True)
     
+    # 💡 [핵심 수정 파트] 지도를 클릭했을 때 자동으로 다음 페이지로 넘어가는 것을 막음.
     if map_data and map_data.get('last_clicked'):
         lat, lon = map_data['last_clicked']['lat'], map_data['last_clicked']['lng']
-        st.session_state.user_location = (lat, lon)
-        st.session_state.nearest_hub = get_nearest_hub(lat, lon)
-        st.session_state.page = 'step2_course'
-        st.rerun()
+        
+        # 소수점 4자리까지 비교하여 같은 마커를 두 번 누를 때 새로고침(리런)되는 현상 방지
+        current_click = (round(lat, 4), round(lon, 4))
+        saved_click = (round(st.session_state.user_location[0], 4), round(st.session_state.user_location[1], 4)) if st.session_state.user_location else None
+        
+        if current_click != saved_click:
+            st.session_state.user_location = (lat, lon)
+            st.session_state.nearest_hub = get_nearest_hub(lat, lon)
+            st.rerun()
+
+    # 💡 팝업을 편하게 본 다음, 유저가 원할 때 "다음" 버튼을 눌러야만 페이지가 넘어가도록 변경.
+    if st.session_state.user_location:
+        st.markdown("<div style='text-align:center; color:#39FF14; font-weight:bold; padding:15px 0 5px 0;'>📍 출발 위치가 맵에 등록되었습니다!</div>", unsafe_allow_html=True)
+        if st.button("다음 : 코스 및 설정하기 🚀", type="primary"):
+            st.session_state.page = 'step2_course'
+            st.rerun()
 
 elif st.session_state.page == 'step2_course':
     st.markdown("<h3>🎯 어디로 달려볼까요?</h3>", unsafe_allow_html=True)
@@ -407,9 +426,9 @@ elif st.session_state.page == 'step2_course':
         mode = st.radio("🏃 코스 형태 선택", ["🚩 다른 거점으로 이동 (A to B)", "🔄 순환형 코스 (Loop)"])
         
         if mode == "🚩 다른 거점으로 이동 (A to B)":
-            end_drop = st.selectbox("🏁 도착 거점", [h for h in hub_names if h != start_hub])
             via1 = st.selectbox("🔹 경유지 1 (선택)", ["선택 안 함"] + hub_names)
             via2 = st.selectbox("🔹 경유지 2 (선택)", ["선택 안 함"] + hub_names)
+            end_drop = st.selectbox("🏁 도착 거점", [h for h in hub_names if h != start_hub])
             
             if st.button("경로 탐색 🚀", type="primary"):
                 with st.spinner("최적 경로 계산 중..."):
@@ -727,15 +746,14 @@ elif st.session_state.page == 'result':
         var mainLayer = L.featureGroup().addTo(map);
         var waterLayer = L.featureGroup();
 
-        var waterIcon = L.divIcon({
-            html: '💧',
-            className: 'custom-water-icon',
-            iconSize: [12, 12],
-            iconAnchor: [6, 6]
-        });
-
         fountainsData.forEach(f => {
-            L.marker([f.lat, f.lon], { icon: waterIcon, interactive: false }).addTo(waterLayer);
+            L.circleMarker([f.lat, f.lon], { 
+                radius: 2, 
+                color: '#00BFFF', 
+                fill: true, 
+                fillOpacity: 0.9,
+                weight: 1 
+            }).addTo(waterLayer);
         });
 
         markers.forEach(m => {
