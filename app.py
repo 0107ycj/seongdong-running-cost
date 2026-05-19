@@ -341,6 +341,8 @@ if st.session_state.page == 'step1_location':
         </div>
     """, unsafe_allow_html=True)
     
+# --- (중략: 코드 상단부 생략) ---
+
     st.markdown("<div style='padding: 0 20px;'>", unsafe_allow_html=True)
     
     m = folium.Map(location=[37.553, 127.042], zoom_start=13.5, tiles=None, zoom_control=False)
@@ -349,35 +351,51 @@ if st.session_state.page == 'step1_location':
     css_injection = """
     <style>
         .leaflet-control-attribution { display: none !important; visibility: hidden !important; }
-        .leaflet-popup-content-wrapper { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
+        .leaflet-popup-content-wrapper { background: rgba(20,20,30,0.95) !important; border: 1px solid #00F5FF !important; border-radius: 12px !important; }
         .leaflet-popup-tip { display: none !important; }
-        .leaflet-popup-content { margin: 0 !important; width: auto !important; }
+        .leaflet-popup-content { margin: 0 !important; width: 170px !important; }
     </style>
     """
     m.get_root().header.add_child(folium.Element(css_injection))
     
+    # 💡 [복구 완료] 성동구 경계선 추가
     if sd_boundary:
-        folium.GeoJson(sd_boundary, style_function=lambda x: {'color': 'white', 'fillColor': 'transparent', 'weight': 2, 'opacity': 0.6, 'dashArray':'5,5'}).add_to(m)
+        folium.GeoJson(
+            sd_boundary, 
+            style_function=lambda x: {
+                'color': 'white', 
+                'fillColor': 'transparent', 
+                'weight': 2, 
+                'opacity': 0.6, 
+                'dashArray':'5,5'
+            }
+        ).add_to(m)
 
+    # 💡 거점 마커 표시
     for name, info in hubs_info.items():
-        coords = info['coords']
-        color = info['color']
-        
         popup_html = f"""
-        <div style="background: rgba(20,20,30,0.95); border: 1px solid {color}; padding: 12px; border-radius: 12px; color: #FFF; width: 170px; box-shadow: 0 4px 15px rgba(0,0,0,0.6);">
-            <div style="font-weight: 900; font-size: 15px; margin-bottom: 8px; text-align: center; color: {color};">{name}</div>
-            <img src="{get_base64_image(info['image'])}" style="width: 100%; height: 85px; object-fit: cover; border-radius: 6px; margin-bottom: 8px;">
-            <div style="font-size: 11px; color: #CCC; margin-bottom: 4px;"><b>유형:</b> {info['type']}</div>
-            <div style="font-size: 11px; color: #CCC; line-height: 1.4;"><b>시설:</b> {", ".join(info['facilities'])}</div>
+        <div style="padding:10px; color:white;">
+            <div style="font-weight:900; font-size:15px; margin-bottom:8px; color:{info['color']};">{name}</div>
+            <img src="{get_base64_image(info['image'])}" style="width:100%; height:80px; object-fit:cover; border-radius:8px; margin-bottom:5px;">
+            <div style="font-size:11px; margin-bottom:3px;"><b>유형:</b> {info['type']}</div>
+            <div style="font-size:11px;"><b>시설:</b> {", ".join(info['facilities'])}</div>
         </div>
         """
-        
-        marker = folium.CircleMarker(location=coords, radius=7, color=color, fill=True, fillOpacity=0.9, weight=2)
-        marker.add_child(folium.Popup(popup_html))
-        marker.add_to(m)
-        
+        folium.CircleMarker(
+            location=info['coords'], radius=7, color=info['color'], fill=True, fillOpacity=0.9, weight=2
+        ).add_child(folium.Popup(popup_html)).add_to(m)
+    
+    # 💡 클릭한 곳 현 위치 마커 표시
+    if st.session_state.user_location:
+        folium.Marker(
+            location=st.session_state.user_location,
+            icon=folium.Icon(color='blue', icon='info-sign')
+        ).add_to(m)
+    
     map_data = st_folium(m, height=450, use_container_width=True, returned_objects=["last_clicked"])
     st.markdown("</div>", unsafe_allow_html=True)
+    
+    # ... (이하 로직 동일)
     
     # 💡 [핵심 수정 파트] 지도를 클릭했을 때 자동으로 다음 페이지로 넘어가는 것을 막음.
     if map_data and map_data.get('last_clicked'):
