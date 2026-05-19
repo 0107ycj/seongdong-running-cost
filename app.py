@@ -328,10 +328,10 @@ if st.session_state.page == 'step1_location':
             <h2 style="margin: 0 0 8px 0; color: #FFF; font-size: 24px; font-weight: 900; letter-spacing: -1px;">Ready to Run?</h2>
             <p style="margin: 0 0 12px 0; color: #8A8AA0; font-size: 12px; line-height: 1.4;">지도에서 <b>현재 위치</b>를 탭하여 웰니스 코스를 탐색하세요.<br>거점 마커를 누르면 상세정보가 뜹니다.</p>
             <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                <span style="background: rgba(57, 255, 20, 0.15); color: #39FF14; border: 1px solid rgba(57,255,20,0.3); padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 800;">🟢 교통 요충지형</span>
-                <span style="background: rgba(0, 245, 255, 0.15); color: #00F5FF; border: 1px solid rgba(0,245,255,0.3); padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 800;">🔵 수변 관문형</span>
-                <span style="background: rgba(255, 215, 0, 0.15); color: #FFD700; border: 1px solid rgba(255,215,0,0.3); padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 800;">🟡 주거 밀착형</span>
-                <span style="background: rgba(255, 45, 120, 0.15); color: #FF2D78; border: 1px solid rgba(255,45,120,0.3); padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 800;">🔴 상권 결합형</span>
+                <span style="background: rgba(57, 255, 20, 0.15); color: #39FF14; border: 1px solid rgba(57,255,20,0.3); padding: 3px 7px; border-radius: 7px; font-size: 9px; font-weight: 700;">🟢 교통 요충지형</span>
+                <span style="background: rgba(0, 245, 255, 0.15); color: #00F5FF; border: 1px solid rgba(0,245,255,0.3); padding: 3px 7px; border-radius: 7px; font-size: 9px; font-weight: 700;">🔵 수변 관문형</span>
+                <span style="background: rgba(255, 215, 0, 0.15); color: #FFD700; border: 1px solid rgba(255,215,0,0.3); padding: 3px 7px; border-radius: 7px; font-size: 9px; font-weight: 700;">🟡 주거 밀착형</span>
+                <span style="background: rgba(255, 45, 120, 0.15); color: #FF2D78; border: 1px solid rgba(255,45,120,0.3); padding: 3px 7px; border-radius: 7px; font-size: 9px; font-weight: 700;">🔴 상권 결합형</span>
             </div>
         </div>
     """, unsafe_allow_html=True)
