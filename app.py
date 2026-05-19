@@ -333,12 +333,6 @@ if st.session_state.page == 'step1_location':
             </div>
         </div>
 
-        <div style="margin: 0 20px 15px 20px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;">
-            <div style="background: rgba(57,255,20,0.15); border: 1px solid #39FF14; color: #39FF14; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 700;">🟢 교통 요충지형</div>
-            <div style="background: rgba(0,245,255,0.15); border: 1px solid #00F5FF; color: #00F5FF; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 700;">🔵 수변 관문형</div>
-            <div style="background: rgba(255,45,120,0.15); border: 1px solid #FF2D78; color: #FF2D78; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 700;">🔴 상권/트렌드형</div>
-            <div style="background: rgba(255,215,0,0.15); border: 1px solid #FFD700; color: #FFD700; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 700;">🟡 주거 밀착형</div>
-        </div>
     """, unsafe_allow_html=True)
     
     st.markdown("<div style='padding: 0 20px;'>", unsafe_allow_html=True)
