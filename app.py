@@ -336,7 +336,6 @@ if st.session_state.page == 'step1_location':
                 <span style="background: rgba(255, 45, 120, 0.15); color: #FF2D78; border: 1px solid rgba(255,45,120,0.3); padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 800;">🔴 상권 결합형</span>
             </div>
         </div>
-
     """, unsafe_allow_html=True)
     
     st.markdown("<div style='padding: 0 20px;'>", unsafe_allow_html=True)
