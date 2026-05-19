@@ -358,7 +358,9 @@ if st.session_state.page == 'step1_location':
         coords = info['coords']
         color = info['color']
         
-        # 💡 수정 1: 팝업 하단에 "이 거점으로 선택하기" 버튼 디자인 추가
+        # 💡 [핵심 수정 1] Javascript를 주입하여 팝업 버튼 클릭 시 Streamlit으로 신호 전달
+        onclick_js = f"var lat={coords[0]}, lng={coords[1]}; for(var k in window){{if(k.startsWith('map_') && window[k] && typeof window[k].fire === 'function'){{window[k].fire('click', {{latlng: L.latLng(lat, lng)}}); break;}}}}"
+        
         popup_html = f"""
         <div style="background: rgba(20,20,30,0.95); border: 1px solid {color}; padding: 12px; border-radius: 12px; color: #FFF; width: 170px; box-shadow: 0 4px 15px rgba(0,0,0,0.6);">
             <div style="font-weight: 900; font-size: 15px; margin-bottom: 8px; text-align: center; color: {color};">{name}</div>
@@ -366,7 +368,7 @@ if st.session_state.page == 'step1_location':
             <div style="font-size: 11px; color: #CCC; margin-bottom: 4px;"><b>유형:</b> {info['type']}</div>
             <div style="font-size: 11px; color: #CCC; line-height: 1.4; margin-bottom: 10px;"><b>시설:</b> {", ".join(info['facilities'])}</div>
             <div style="text-align: center;">
-                <div style="background: {color}; color: #000; padding: 6px; border-radius: 6px; font-size: 11px; font-weight: 900; cursor: pointer;">이 거점으로 선택하기</div>
+                <div onclick="{onclick_js}" style="background: {color}; color: #000; padding: 6px; border-radius: 6px; font-size: 11px; font-weight: 900; cursor: pointer;">이 거점으로 선택하기</div>
             </div>
         </div>
         """
@@ -375,7 +377,6 @@ if st.session_state.page == 'step1_location':
         marker.add_child(folium.Popup(popup_html))
         marker.add_to(m)
         
-    # 💡 지도 높이를 450에서 400으로 줄여서 세로 밀림 방지
     map_data = st_folium(m, height=400, use_container_width=True, returned_objects=["last_clicked"])
     st.markdown("</div>", unsafe_allow_html=True)
     
@@ -412,7 +413,7 @@ elif st.session_state.page == 'step2_course':
         start_hub = st.selectbox("📍 출발 거점", hub_names, index=hub_names.index(st.session_state.nearest_hub))
         mode = st.radio("🏃 코스 형태 선택", ["🚩 다른 거점으로 이동 (A to B)", "🔄 순환형 코스 (Loop)"])
         
-        # 💡 수정 2: 셀렉트박스 순서 변경 (출발지 -> 경유지1 -> 경유지2 -> 도착지)
+        # 💡 [핵심 수정 2] 셀렉트박스 표시 순서 변경: 출발거점 -> 경유지1 -> 경유지2 -> 도착거점
         if mode == "🚩 다른 거점으로 이동 (A to B)":
             via1 = st.selectbox("🔹 경유지 1 (선택)", ["선택 안 함"] + hub_names)
             via2 = st.selectbox("🔹 경유지 2 (선택)", ["선택 안 함"] + hub_names)
