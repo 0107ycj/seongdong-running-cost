@@ -305,6 +305,8 @@ def get_pareto_optimal_path(G, source, target, min_ratio=1.0, max_ratio=1.5):
         return shortest_path
     except: return []
 
+# --- (상단 코드 및 상태 관리 동일) ---
+
 # --- 4. 화면 제어 ---
 
 if st.session_state.page == 'step1_location':
@@ -323,7 +325,7 @@ if st.session_state.page == 'step1_location':
             </div>
         </div>
         
-        <div style="margin: 5px 20px 20px 20px; background: linear-gradient(135deg, rgba(0,245,255,0.15) 0%, rgba(0,0,0,0) 100%); border: 1px solid rgba(0,245,255,0.2); border-radius: 20px; padding: 22px; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
+        <div style="margin: 5px 20px 15px 20px; background: linear-gradient(135deg, rgba(0,245,255,0.15) 0%, rgba(0,0,0,0) 100%); border: 1px solid rgba(0,245,255,0.2); border-radius: 20px; padding: 22px; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
             <div style="position: absolute; right: -15px; bottom: -20px; font-size: 110px; opacity: 0.1; transform: rotate(-15deg);">👟</div>
             <h2 style="margin: 0 0 8px 0; color: #FFF; font-size: 26px; font-weight: 900; letter-spacing: -1px;">Ready to Run?</h2>
             <p style="margin: 0 0 16px 0; color: #8A8AA0; font-size: 13px; line-height: 1.4;">지도에서 <b>현재 위치</b>를 탭하여<br>최적의 웰니스 러닝 코스를 탐색하세요.<br>거점 마커를 누르면 상세정보가 뜹니다.</p>
@@ -332,12 +334,21 @@ if st.session_state.page == 'step1_location':
                 <span style="background: rgba(255, 45, 120, 0.15); color: #FF2D78; border: 1px solid rgba(255,45,120,0.3); padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;">🍃 대기질 최고</span>
             </div>
         </div>
+        
+        <div style="margin: 0 20px 15px 20px; display: flex; flex-wrap: nowrap; gap: 4px; justify-content: space-between;">
+            <div style="background: rgba(57,255,20,0.15); border: 1px solid #39FF14; color: #39FF14; padding: 4px 2px; border-radius: 8px; font-size: 9px; font-weight: 800; text-align:center; flex:1;">🟢 교통</div>
+            <div style="background: rgba(0,245,255,0.15); border: 1px solid #00F5FF; color: #00F5FF; padding: 4px 2px; border-radius: 8px; font-size: 9px; font-weight: 800; text-align:center; flex:1;">🔵 수변</div>
+            <div style="background: rgba(255,45,120,0.15); border: 1px solid #FF2D78; color: #FF2D78; padding: 4px 2px; border-radius: 8px; font-size: 9px; font-weight: 800; text-align:center; flex:1;">🔴 상권</div>
+            <div style="background: rgba(255,215,0,0.15); border: 1px solid #FFD700; color: #FFD700; padding: 4px 2px; border-radius: 8px; font-size: 9px; font-weight: 800; text-align:center; flex:1;">🟡 주거</div>
+        </div>
     """, unsafe_allow_html=True)
     
     st.markdown("<div style='padding: 0 20px;'>", unsafe_allow_html=True)
     
     m = folium.Map(location=[37.553, 127.042], zoom_start=13.5, tiles=None, zoom_control=False)
     folium.TileLayer('CartoDB dark_matter', attr=' ').add_to(m)
+
+    # --- (하단 마커 로직 및 페이지 전환 코드 생략 - 이전과 동일하게 유지) ---
     
     css_injection = """
     <style>
