@@ -385,30 +385,35 @@ if st.session_state.page == 'step1_location':
             location=info['coords'], radius=7, color=info['color'], fill=True, fillOpacity=0.9, weight=2
         ).add_child(folium.Popup(popup_html)).add_to(m)
     
-    # 💡 클릭한 곳 현 위치 마커 표시
+# --- (중략: 상단부는 그대로 유지) ---
+
+    # 💡 [핵심] 현 위치 마커를 CircleMarker로 변경하여 오차 방지
     if st.session_state.user_location:
-        folium.Marker(
+        folium.CircleMarker(
             location=st.session_state.user_location,
-            icon=folium.Icon(color='blue', icon='info-sign')
+            radius=8,
+            color="#FF9500",
+            fill=True,
+            fillColor="#FF9500",
+            fillOpacity=1,
+            weight=2
         ).add_to(m)
     
+    # 💡 map_data 처리 로직 개선
     map_data = st_folium(m, height=450, use_container_width=True, returned_objects=["last_clicked"])
     st.markdown("</div>", unsafe_allow_html=True)
     
-    # ... (이하 로직 동일)
-    
-    # 💡 [핵심 수정 파트] 지도를 클릭했을 때 자동으로 다음 페이지로 넘어가는 것을 막음.
     if map_data and map_data.get('last_clicked'):
-        lat, lon = map_data['last_clicked']['lat'], map_data['last_clicked']['lng']
+        lat = map_data['last_clicked']['lat']
+        lon = map_data['last_clicked']['lng']
         
-        # 소수점 4자리까지 비교하여 같은 마커를 두 번 누를 때 새로고침(리런)되는 현상 방지
-        current_click = (round(lat, 4), round(lon, 4))
-        saved_click = (round(st.session_state.user_location[0], 4), round(st.session_state.user_location[1], 4)) if st.session_state.user_location else None
-        
-        if current_click != saved_click:
+        # 💡 오차 방지: 값이 너무 미세하게 변하는 경우 새로고침 방지
+        if abs(lat - (st.session_state.user_location[0] if st.session_state.user_location else 0)) > 0.0001:
             st.session_state.user_location = (lat, lon)
             st.session_state.nearest_hub = get_nearest_hub(lat, lon)
             st.rerun()
+
+# --- (이하 나머지 코드는 동일) ---
 
     # 💡 팝업을 편하게 본 다음, 유저가 원할 때 "다음" 버튼을 눌러야만 페이지가 넘어가도록 변경.
     if st.session_state.user_location:
