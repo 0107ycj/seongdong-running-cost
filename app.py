@@ -358,12 +358,16 @@ if st.session_state.page == 'step1_location':
         coords = info['coords']
         color = info['color']
         
+        # 💡 수정 1: 팝업 하단에 "이 거점으로 선택하기" 버튼 디자인 추가
         popup_html = f"""
         <div style="background: rgba(20,20,30,0.95); border: 1px solid {color}; padding: 12px; border-radius: 12px; color: #FFF; width: 170px; box-shadow: 0 4px 15px rgba(0,0,0,0.6);">
             <div style="font-weight: 900; font-size: 15px; margin-bottom: 8px; text-align: center; color: {color};">{name}</div>
             <img src="{get_base64_image(info['image'])}" style="width: 100%; height: 85px; object-fit: cover; border-radius: 6px; margin-bottom: 8px;">
             <div style="font-size: 11px; color: #CCC; margin-bottom: 4px;"><b>유형:</b> {info['type']}</div>
-            <div style="font-size: 11px; color: #CCC; line-height: 1.4;"><b>시설:</b> {", ".join(info['facilities'])}</div>
+            <div style="font-size: 11px; color: #CCC; line-height: 1.4; margin-bottom: 10px;"><b>시설:</b> {", ".join(info['facilities'])}</div>
+            <div style="text-align: center;">
+                <div style="background: {color}; color: #000; padding: 6px; border-radius: 6px; font-size: 11px; font-weight: 900; cursor: pointer;">이 거점으로 선택하기</div>
+            </div>
         </div>
         """
         
@@ -408,10 +412,11 @@ elif st.session_state.page == 'step2_course':
         start_hub = st.selectbox("📍 출발 거점", hub_names, index=hub_names.index(st.session_state.nearest_hub))
         mode = st.radio("🏃 코스 형태 선택", ["🚩 다른 거점으로 이동 (A to B)", "🔄 순환형 코스 (Loop)"])
         
+        # 💡 수정 2: 셀렉트박스 순서 변경 (출발지 -> 경유지1 -> 경유지2 -> 도착지)
         if mode == "🚩 다른 거점으로 이동 (A to B)":
-            end_drop = st.selectbox("🏁 도착 거점", [h for h in hub_names if h != start_hub])
             via1 = st.selectbox("🔹 경유지 1 (선택)", ["선택 안 함"] + hub_names)
             via2 = st.selectbox("🔹 경유지 2 (선택)", ["선택 안 함"] + hub_names)
+            end_drop = st.selectbox("🏁 도착 거점", [h for h in hub_names if h != start_hub])
             
             if st.button("경로 탐색 🚀", type="primary"):
                 with st.spinner("최적 경로 계산 중..."):
