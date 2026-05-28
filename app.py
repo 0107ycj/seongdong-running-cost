@@ -27,6 +27,12 @@ def get_base64_image(image_filename):
 st.markdown("""
     <style>
         .block-container { padding: 0 !important; max-width: 430px !important; margin: 0 auto !important; background-color: #0A0A0F; min-height: 100vh; overflow-x: hidden;}
+        
+        /* 💡 추가된 부분: 태블릿 및 넓은 화면(768px 이상) 기준 양쪽 1/7씩 여백 (전체의 5/7 사용) */
+        @media (min-width: 768px) {
+            .block-container { max-width: 71.42% !important; }
+        }
+
         header { display: none !important; }
         footer { display: none !important; }
         iframe { border: none !important; width: 100% !important; border-radius: 0 0 24px 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
